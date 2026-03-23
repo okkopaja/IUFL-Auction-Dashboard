@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuctionSession {
+  id           String        @id @default(cuid())
+  name         String
+  isActive     Boolean       @default(true)
+  totalPoints  Int           @default(1000)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  teams        Team[]
+  players      Player[]
+  transactions Transaction[]
+}
+
+model Team {
+  id               String         @id @default(cuid())
+  name             String
+  shortCode        String         @unique
+  domain           String
+  pointsTotal      Int            @default(1000)
+  pointsSpent      Int            @default(0)
+  sessionId        String
+  session          AuctionSession @relation(fields: [sessionId], references: [id])
+  players          Player[]
+  transactions     Transaction[]
+  createdAt        DateTime       @default(now())
+
+  @@index([sessionId])
+}
+
+model Player {
+  id           String         @id @default(cuid())
+  name         String
+  position     String
+  year         String?
+  imageUrl     String?
+  basePrice    Int            @default(50)
+  status       PlayerStatus   @default(UNSOLD)
+  teamId       String?
+  team         Team?          @relation(fields: [teamId], references: [id])
+  sessionId    String
+  session      AuctionSession @relation(fields: [sessionId], references: [id])
+  transactions Transaction[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([sessionId])
+  @@index([status])
+}
+
+enum PlayerStatus {
+  UNSOLD
+  SOLD
+  IN_AUCTION
+}
+
+model Transaction {
+  id        String         @id @default(cuid())
+  playerId  String
+  player    Player         @relation(fields: [playerId], references: [id])
+  teamId    String
+  team      Team           @relation(fields: [teamId], references: [id])
+  sessionId String
+  session   AuctionSession @relation(fields: [sessionId], references: [id])
+  amount    Int
+  createdAt DateTime       @default(now())
+
+  @@index([sessionId])
+}
