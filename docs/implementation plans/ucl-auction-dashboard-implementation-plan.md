@@ -1,4 +1,4 @@
-# UCL Fantasy Auction Dashboard Implementation Plan
+# IUFL 2026 Player Auction Dashboard Implementation Plan
 
 ## Document Purpose
 
@@ -216,7 +216,7 @@ Create the persistent data model exactly once and make it trustworthy.
 3. Create the first migration.
 4. Add `prisma/seed.ts`.
 5. Seed:
-   - one active session named `UCL Fantasy Auction 2026`
+   - one active session named `IUFL 2026 Player Auction 2026`
    - all 16 UCL teams from the PRD
    - at least 30 players with varied positions and placeholder image URLs
 6. Ensure seed behavior is idempotent enough for repeated local runs, or document that the DB should be reset before reseeding.

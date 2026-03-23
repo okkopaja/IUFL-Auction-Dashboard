@@ -2,7 +2,7 @@
 
 # 📄 Product Requirements Document
 
-## UCL Fantasy Auction Dashboard
+## IUFL 2026 Player Auction Dashboard
 
 **Version:** 1.0
 **Date:** March 23, 2026
@@ -653,7 +653,7 @@ export const useAuctionStore = create<AuctionState>((set, get) => ({
 
 The seed file should:
 
-1. Create one `AuctionSession` named `"UCL Fantasy Auction 2026"`
+1. Create one `AuctionSession` named `"IUFL 2026 Player Auction 2026"`
 2. Create all 16 teams from the table in Section 4 with `pointsTotal: 1000`
 3. Create at least 30 sample players with varied positions (`GK`, `CB`, `LB`, `RB`, `CM`, `CAM`, `LW`, `RW`, `ST`) and `status: UNSOLD`
 
@@ -691,7 +691,7 @@ images: { domains: ['cdn.brandfetch.io'] }
 
 ***
 
-This PRD covers the complete specification needed for an AI IDE agent to implement the entire UCL Fantasy Auction Dashboard from scratch — including the database schema, Brandfetch logo integration, Lottie animation placements, ShadCN UI component usage, and the full Express + Prisma backend.[^2][^3][^4][^5][^1]
+This PRD covers the complete specification needed for an AI IDE agent to implement the entire IUFL 2026 Player Auction Dashboard from scratch — including the database schema, Brandfetch logo integration, Lottie animation placements, ShadCN UI component usage, and the full Express + Prisma backend.[^2][^3][^4][^5][^1]
 <span style="display:none">[^10][^11][^12][^13][^14][^15][^16][^17][^18][^6][^7][^8][^9]</span>
 
 <div align="center">⁂</div>
