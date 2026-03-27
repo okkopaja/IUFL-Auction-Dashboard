@@ -1,7 +1,7 @@
 "use client";
 
-import { getTeamLogoUrl } from "@/lib/brandfetch";
 import { useState } from "react";
+import { getTeamLogoUrl } from "@/lib/brandfetch";
 
 interface TeamLogoProps {
   domain: string;

@@ -4,12 +4,17 @@ import { FastForward, Gavel, History, Minus, Plus, Rewind } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useNextPlayer, useSellPlayer } from "@/hooks/useAuction";
-import { AUCTION_BID_STEP } from "@/lib/constants";
+import {
+  AUCTION_BID_STEP_BASE,
+  AUCTION_BID_STEP_HIGH,
+  AUCTION_BID_STEP_THRESHOLD,
+  AUCTION_START_BID,
+} from "@/lib/constants";
 import { useAuctionStore } from "@/store/auctionStore";
 import type { Player, Team, Transaction } from "@/types";
+import { TeamLogo } from "../shared/TeamLogo";
 import { Button } from "../ui/button";
 import { TeamSelectPopup } from "./TeamSelectPopup";
-import { TeamLogo } from "../shared/TeamLogo";
 
 export function BidControls({
   player,
@@ -28,15 +33,19 @@ export function BidControls({
   const nextMutation = useNextPlayer();
 
   useEffect(() => {
-    // If the store bid is 0, initialize it to base price when player mounts
-    if (currentBid === 0 && player.basePrice > 0) {
-      setBid(player.basePrice);
+    if (currentBid === 0) {
+      setBid(AUCTION_START_BID);
     }
-  }, [player.id, player.basePrice, currentBid, setBid]);
+  }, [player.id, currentBid, setBid]);
 
-  const handleIncrement = () => setBid(currentBid + AUCTION_BID_STEP);
+  const getBidStep = (bid: number) =>
+    bid >= AUCTION_BID_STEP_THRESHOLD
+      ? AUCTION_BID_STEP_HIGH
+      : AUCTION_BID_STEP_BASE;
+
+  const handleIncrement = () => setBid(currentBid + getBidStep(currentBid));
   const handleDecrement = () =>
-    setBid(Math.max(player.basePrice, currentBid - AUCTION_BID_STEP));
+    setBid(Math.max(AUCTION_START_BID, currentBid - getBidStep(currentBid)));
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
 
@@ -51,7 +60,7 @@ export function BidControls({
     }
 
     sellMutation.mutate(
-      { teamId: selectedTeamId, amount: currentBid },
+      { playerId: player.id, teamId: selectedTeamId, amount: currentBid },
       {
         onSuccess: () => {
           toast.success(
@@ -76,123 +85,121 @@ export function BidControls({
   const previousTransaction = logs?.[0];
 
   return (
-    <div className="w-full max-w-md flex flex-col items-center gap-8 z-20">
-      {/* Bid Adjustment Container */}
-      <div className="flex items-center justify-between w-full bg-pitch-900 border border-slate-700/50 rounded-3xl p-4 shadow-xl backdrop-blur-md">
-        <Button
-          variant="outline"
-          size="icon"
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-slate-600 bg-pitch-950 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
-          onClick={handleDecrement}
-          disabled={currentBid <= player.basePrice}
-        >
-          <Minus className="w-8 h-8 sm:w-10 sm:h-10" />
-        </Button>
+    <div className="w-full max-w-[440px] flex flex-col items-center gap-6 z-20">
+      {/* Bid Display */}
+      <div className="w-full flex flex-col items-center mb-4">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">
+          Current Bid
+        </span>
+        <div className="flex items-center justify-between w-full">
+          <button
+            className="w-14 h-14 flex items-center justify-center rounded-xl bg-[#1a1a1a] border border-[#333] text-slate-400 hover:text-white hover:bg-[#222] hover:border-[#444] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleDecrement}
+            disabled={currentBid <= AUCTION_START_BID}
+          >
+            <Minus className="w-6 h-6" />
+          </button>
 
-        <div className="flex flex-col items-center justify-center flex-1">
-          <span className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">
-            Bid Value
-          </span>
-          <span className="text-5xl sm:text-6xl font-mono font-bold text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-            {currentBid || player.basePrice}
-          </span>
+          <div className="flex-1 flex justify-center text-6xl md:text-8xl font-mono font-medium text-white tracking-tighter">
+            {currentBid || AUCTION_START_BID}
+          </div>
+
+          <button
+            className="w-14 h-14 flex items-center justify-center rounded-xl bg-[#1a1a1a] border border-[#333] text-slate-400 hover:text-white hover:bg-[#222] hover:border-[#444] transition-all"
+            onClick={handleIncrement}
+          >
+            <Plus className="w-6 h-6" />
+          </button>
         </div>
-
-        <Button
-          variant="outline"
-          size="icon"
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-slate-600 bg-pitch-950 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
-          onClick={handleIncrement}
-        >
-          <Plus className="w-8 h-8 sm:w-10 sm:h-10" />
-        </Button>
       </div>
 
-      {/* Target Team Selection (Mobile only, but could be unified) */}
+      {/* Target Team Selection (Mobile only) */}
       <div className="w-full md:hidden">
         <TeamSelectPopup teams={teams} />
       </div>
 
-      {/* Sell Button */}
-      <Button
-        size="lg"
-        className="w-full h-20 text-2xl font-black uppercase tracking-widest bg-accent-gold text-black hover:bg-yellow-400 border-accent-gold rounded-3xl shadow-[0_0_30px_rgba(245,200,66,0.3)] hover:shadow-[0_0_50px_rgba(245,200,66,0.5)] transition-all flex items-center justify-center"
-        onClick={handleSell}
-        disabled={
-          sellMutation.isPending || nextMutation.isPending || !selectedTeamId
-        }
-      >
-        <Gavel className="w-8 h-8 mr-4" />
-        {sellMutation.isPending ? "Selling..." : "Sell"}
-      </Button>
-
-      {/* If a team is selected on desktop, show it below SELL to make "to select one and sell" clear */}
-      <div className="hidden md:flex flex-col items-center gap-2 mt-[-1rem]">
-        {selectedTeamId ? (
-          <span className="text-xs text-slate-400 font-mono tracking-wider uppercase">
-            Selling to:{" "}
-            <span className="font-bold text-accent-gold">
-              {selectedTeam?.shortCode}
+      {/* Sell Target Information */}
+      <div className="w-full flex flex-col">
+        <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono tracking-widest uppercase mb-2 px-1">
+          <span>Target Franchise</span>
+          {selectedTeamId ? (
+            <span className="text-accent-gold">
+              {selectedTeam?.shortCode} selected
             </span>
-          </span>
-        ) : (
-          <span className="text-xs text-rose-400 font-mono tracking-wider uppercase">
-            Select a team from list first
-          </span>
-        )}
+          ) : (
+            <span className="text-rose-500/80">None Selected</span>
+          )}
+        </div>
+
+        {/* Sell Button */}
+        <button
+          className="w-full h-16 text-xl font-bold uppercase tracking-widest bg-white text-black hover:bg-[#e0e0e0] transition-colors rounded-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleSell}
+          disabled={
+            sellMutation.isPending || nextMutation.isPending || !selectedTeamId
+          }
+        >
+          <Gavel className="w-5 h-5 mr-3" />
+          {sellMutation.isPending ? "Selling..." : "Sell Player"}
+        </button>
       </div>
 
-      {/* Prev / Next Controls */}
-      <div className="flex w-full gap-4 justify-center">
-        {/* We only have logic for pass/next in the current hooks, so I'll wrap it in a single Next button that looks like >> or keep << disabled. */}
-        <Button
-          variant="outline"
-          className="flex-1 h-14 bg-pitch-900 border-slate-700 hover:bg-slate-800 text-slate-400 rounded-2xl uppercase tracking-wider font-bold opacity-50 cursor-not-allowed"
+      {/* Pass / Next Controls */}
+      <div className="flex w-full gap-3 mt-2">
+        <button
+          className="flex-1 h-12 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-500 rounded-xl uppercase tracking-wider font-bold text-xs transition-colors cursor-not-allowed"
           disabled
         >
-          <Rewind className="w-6 h-6" />
-        </Button>
+          <Rewind className="w-4 h-4 mr-2" />
+          Undo
+        </button>
 
-        <Button
-          variant="outline"
-          className="flex-1 h-14 bg-pitch-900 border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white rounded-2xl uppercase tracking-wider font-bold"
+        <button
+          className="flex-1 h-12 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors"
           onClick={handleNext}
           disabled={sellMutation.isPending || nextMutation.isPending}
         >
-          <FastForward className="w-6 h-6" />
-        </Button>
+          Pass / Next
+          <FastForward className="w-4 h-4 ml-2" />
+        </button>
       </div>
 
-      {/* Previous Player Box */}
-      {previousTransaction ? (
-        <div className="w-full bg-pitch-900/80 border border-slate-700/50 rounded-3xl p-6 flex flex-col items-center justify-center text-center backdrop-blur shadow-inner mt-4">
-          <History className="w-5 h-5 text-slate-500 mb-3" />
-          <h4 className="text-lg font-bold text-slate-200 uppercase tracking-widest mb-2 leading-tight">
-            {previousTransaction.player.name}
-          </h4>
-          <div className="flex items-center justify-center gap-2 text-sm font-mono text-slate-400">
-            <span>bought by</span>
-            <span className="flex items-center gap-1 font-bold text-white bg-slate-800 px-2 py-1 rounded">
-              <TeamLogo
-                domain={previousTransaction.team.domain}
-                name={previousTransaction.team.name}
-                size={16}
-              />
-              {previousTransaction.team.shortCode}
-            </span>
-            <span>for</span>
-            <span className="font-bold text-accent-gold ml-1">
+      {/* Previous Player Log */}
+      <div className="w-full pt-6 border-t border-[#222] mt-4 flex flex-col items-center">
+        <div className="flex items-center text-[#555] text-[10px] uppercase font-mono tracking-widest mb-3">
+          <History className="w-3 h-3 mr-2" /> Previous Transaction
+        </div>
+
+        {previousTransaction ? (
+          <div className="w-full bg-[#111] border border-[#222] rounded-xl p-4 flex justify-between items-center">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-slate-200">
+                {previousTransaction.player.name}
+              </span>
+              <div className="flex items-center gap-1.5 mt-1 text-slate-500 text-xs">
+                <span>Sold to</span>
+                <span className="flex items-center gap-1 font-medium text-slate-300">
+                  <TeamLogo
+                    domain={previousTransaction.team.domain}
+                    name={previousTransaction.team.name}
+                    size={14}
+                  />
+                  {previousTransaction.team.shortCode}
+                </span>
+              </div>
+            </div>
+            <span className="font-mono text-lg font-bold text-white">
               ♦ {previousTransaction.amount}
             </span>
           </div>
-        </div>
-      ) : (
-        <div className="w-full bg-pitch-900/50 border border-slate-800/50 rounded-3xl p-6 flex items-center justify-center text-center mt-4 border-dashed">
-          <span className="text-slate-600 font-mono text-xs uppercase tracking-widest">
-            No previous transaction
-          </span>
-        </div>
-      )}
+        ) : (
+          <div className="w-full bg-transparent border border-[#222] border-dashed rounded-xl p-4 flex items-center justify-center">
+            <span className="text-[#444] font-mono text-xs uppercase tracking-widest">
+              No recent logs
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

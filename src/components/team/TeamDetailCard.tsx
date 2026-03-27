@@ -122,7 +122,8 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
                     </TableCell>
                     <TableCell>
                       <span className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px] font-bold border border-slate-700 uppercase tracking-wider">
-                        {player.position}
+                        {player.position1}
+                        {player.position2 ? ` / ${player.position2}` : ""}
                       </span>
                     </TableCell>
                     <TableCell className="text-right pr-6 md:pr-8 font-mono text-xl font-bold text-accent-gold drop-shadow-sm">

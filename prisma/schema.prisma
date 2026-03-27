@@ -36,23 +36,28 @@ model Team {
 }
 
 model Player {
-  id           String         @id @default(cuid())
-  name         String
-  position     String
-  year         String?
-  imageUrl     String?
-  basePrice    Int            @default(50)
-  status       PlayerStatus   @default(UNSOLD)
-  teamId       String?
-  team         Team?          @relation(fields: [teamId], references: [id])
-  sessionId    String
-  session      AuctionSession @relation(fields: [sessionId], references: [id])
-  transactions Transaction[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  name            String
+  position1       String
+  position2       String?
+  year            String?
+  imageUrl        String?
+  basePrice       Int            @default(50)
+  status          PlayerStatus   @default(UNSOLD)
+  teamId          String?
+  team            Team?          @relation(fields: [teamId], references: [id])
+  sessionId       String
+  session         AuctionSession @relation(fields: [sessionId], references: [id])
+  transactions    Transaction[]
+  whatsappNumber  String         @default("")
+  stream          String         @default("")
+  importOrder     Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([sessionId])
   @@index([status])
+  @@index([sessionId, importOrder])
 }
 
 enum PlayerStatus {

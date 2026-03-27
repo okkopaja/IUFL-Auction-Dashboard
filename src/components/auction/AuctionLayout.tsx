@@ -40,44 +40,49 @@ export function AuctionLayout() {
   if (!teams) return null;
 
   return (
-    <div className="flex w-full h-[100dvh] p-4 md:p-8 gap-6 relative z-10 overflow-hidden text-slate-200">
+    <div className="flex w-full h-[100dvh] bg-[#0a0a0a] text-slate-200 antialiased overflow-hidden">
       {/* Theme toggle — top-right corner */}
-      <div className="absolute top-4 right-4 z-50 md:top-8 md:right-8">
+      <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
       </div>
 
-      <div className="hidden md:flex w-[320px] flex-shrink-0 flex-col h-full bg-pitch-900/60 border border-slate-800/80 rounded-[2.5rem] shadow-2xl backdrop-blur-xl p-4">
-        <h2 className="text-xl font-heading text-center text-slate-300 tracking-widest mb-4 mt-2">
-          Team List
-        </h2>
-        <TeamSidebar teams={teams} />
+      {/* Left Sidebar: Team List */}
+      <div className="hidden md:flex w-[320px] flex-shrink-0 flex-col h-full bg-[#111111] border-r border-[#222]">
+        <div className="p-6 border-b border-[#222]">
+          <h2 className="text-sm font-semibold text-slate-400 tracking-wider uppercase">
+            Franchise Standings
+          </h2>
+        </div>
+        <div className="flex-1 overflow-hidden p-3">
+          <TeamSidebar teams={teams} />
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden w-full gap-6">
-        <div className="flex-1 rounded-[3rem] border border-slate-700/50 bg-pitch-900/40 shadow-2xl backdrop-blur-3xl overflow-hidden p-6 md:p-10 flex gap-6 md:gap-10 relative">
-          {player ? (
-            <>
-              {/* Left Side: Player Area */}
-              <div className="w-full md:w-5/12 flex-shrink-0 flex flex-col items-center justify-center border border-slate-700/40 rounded-[2.5rem] p-6 lg:p-10 bg-slate-900/50 relative shadow-inner overflow-hidden group hover:border-slate-600/60 transition-colors duration-500">
-                <PlayerCard player={player} />
-              </div>
-
-              {/* Right Side: Controls Area */}
-              <div className="flex-1 flex flex-col justify-center items-center gap-6">
-                <BidControls player={player} teams={teams} logs={logs || []} />
-              </div>
-            </>
-          ) : (
-            <div className="w-full flex flex-col items-center justify-center text-center">
-              <h2 className="text-4xl font-heading mb-4 text-accent-gold drop-shadow-lg">
-                Auction Complete
-              </h2>
-              <p className="text-slate-400 text-lg">
-                All players have been processed.
-              </p>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-full bg-[#0a0a0a] relative">
+        {player ? (
+          <div className="flex-1 flex flex-col md:flex-row h-full">
+            {/* Player Preview */}
+            <div className="w-full md:w-1/2 lg:w-[45%] h-full flex items-center justify-center p-6 lg:p-12 relative border-b md:border-b-0 md:border-r border-[#222]">
+              <div className="absolute inset-0 bg-gradient-to-br from-[#111]/80 to-transparent z-0 pointer-events-none" />
+              <PlayerCard player={player} />
             </div>
-          )}
-        </div>
+
+            {/* Bidding Controls Area */}
+            <div className="flex-1 h-full flex flex-col items-center justify-center p-6 lg:p-12 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f]">
+              <BidControls player={player} teams={teams} logs={logs || []} />
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-black">
+            <h2 className="text-3xl font-light tracking-widest text-[#555] mb-2 uppercase">
+              Auction Complete
+            </h2>
+            <p className="text-[#444] text-sm">
+              All players have been processed.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

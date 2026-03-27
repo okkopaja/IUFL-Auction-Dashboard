@@ -5,57 +5,57 @@ import type { Player } from "@/types";
 export function PlayerCard({ player }: { player: Player | null }) {
   if (!player) return null;
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center p-4">
-      {/* Player PIC (Circle) */}
-      <div className="w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden border-4 border-slate-700/50 relative shadow-2xl mb-8 flex-shrink-0 bg-pitch-900 group">
-        <div className="absolute inset-0 bg-gradient-to-t from-pitch-900/40 to-transparent z-10" />
-        {player.imageUrl ? (
-          <Image
-            src={player.imageUrl}
-            alt={player.name}
-            fill
-            className="object-cover object-top opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-            sizes="(max-width: 768px) 100vw, 400px"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-600 bg-pitch-800">
-            <User className="w-24 h-24" />
-          </div>
+    <div className="w-full max-w-[360px] aspect-[4/5] relative rounded-2xl overflow-hidden shadow-2xl bg-[#0f0f0f] border border-[#333] group transition-all duration-300">
+      {/* Background Image / Placeholder */}
+      {player.imageUrl ? (
+        <Image
+          src={player.imageUrl}
+          alt={player.name}
+          fill
+          className="object-cover object-top opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+          sizes="(max-width: 768px) 100vw, 400px"
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center text-[#333] bg-[#0a0a0a] inset-0 absolute">
+          <User className="w-32 h-32 opacity-20" />
+        </div>
+      )}
+
+      {/* Gradient Overlay for Text Visibility */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
+
+      {/* Top Badges */}
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+        <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-slate-200 border border-slate-700/50 rounded-md text-[10px] font-bold uppercase tracking-widest">
+          Base: ♦ {player.basePrice}
+        </span>
+        {player.year && (
+          <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-slate-300 border border-slate-700/50 rounded-md text-[10px] uppercase font-mono tracking-widest">
+            {player.year}
+          </span>
         )}
       </div>
 
-      {/* Player Details Box */}
-      <div className="w-full max-w-sm rounded-[2rem] border border-slate-700/50 bg-pitch-900/60 p-6 md:p-8 flex flex-col gap-4 items-center text-center shadow-xl backdrop-blur-md relative overflow-hidden">
-        <div className="absolute top-0 right-[-10%] w-32 h-32 bg-accent-gold/5 blur-[80px] rounded-full pointer-events-none" />
+      {/* Player Info (Bottom) */}
+      <div className="absolute bottom-0 left-0 w-full p-6 z-20 flex flex-col">
+        {/* Positions */}
+        <div className="flex gap-2 mb-2">
+          <span className="text-accent-gold font-mono text-sm tracking-widest uppercase font-semibold drop-shadow-md">
+            {player.position1}
+            {player.position2 && (
+              <span className="text-slate-400"> / {player.position2}</span>
+            )}
+          </span>
+        </div>
 
-        <h2 className="text-3xl md:text-5xl font-heading font-black text-white tracking-widest uppercase drop-shadow-md leading-tight">
+        {/* Name */}
+        <h2 className="text-4xl leading-none font-black text-white tracking-widest uppercase mb-1">
           {player.name}
         </h2>
-
-        <div className="flex flex-col gap-3 mt-2 w-full items-center">
-          <div className="flex gap-2 justify-center w-full">
-            <span className="px-4 py-1.5 bg-accent-gold/10 text-accent-gold shadow-[0_0_15px_-3px_rgba(245,200,66,0.2)] border border-accent-gold/30 rounded-full text-sm font-bold uppercase tracking-wider backdrop-blur-md">
-              {player.position}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 mt-2 w-full">
-            <span className="text-slate-400 font-mono text-sm uppercase tracking-wider">
-              Base Price:
-            </span>
-            <span className="text-lg font-bold text-white tracking-widest">
-              ♦ {player.basePrice}
-            </span>
-          </div>
-
-          {player.year && (
-            <div className="mt-2 text-slate-500 font-mono text-xs uppercase tracking-widest flex gap-2">
-              <span>Class:</span>
-              <span className="text-slate-300 font-bold">{player.year}</span>
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Subtle shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-30" />
     </div>
   );
 }
