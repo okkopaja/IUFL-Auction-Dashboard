@@ -83,13 +83,19 @@ export function useSellPlayer() {
 
   return useMutation({
     mutationFn: async ({
+      playerId,
       teamId,
       amount,
     }: {
+      playerId: string;
       teamId: string;
       amount: number;
     }) => {
-      const { data } = await api.post("/auction/sell", { teamId, amount });
+      const { data } = await api.post("/auction/sell", {
+        playerId,
+        teamId,
+        amount,
+      });
       return data.data;
     },
     onSuccess: (data, variables) => {
@@ -104,7 +110,7 @@ export function useSellPlayer() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.auctionLog });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players() });
       if (data.nextPlayer) {
-        resetForNewPlayer(data.nextPlayer.basePrice);
+        resetForNewPlayer();
       }
     },
   });
@@ -122,7 +128,7 @@ export function useNextPlayer() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.currentPlayer });
       if (data.nextPlayer) {
-        resetForNewPlayer(data.nextPlayer.basePrice);
+        resetForNewPlayer();
       }
     },
   });

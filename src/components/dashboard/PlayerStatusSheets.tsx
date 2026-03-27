@@ -3,9 +3,9 @@
 import { Users, UserX } from "lucide-react";
 import { useState } from "react";
 import { usePlayers } from "@/hooks/useAuction";
+import { cn } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 import { buttonVariants } from "../ui/button";
-import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -124,7 +124,10 @@ function PlayerListContent({
         >
           <div>
             <div className="font-medium text-slate-200">{p.name}</div>
-            <div className="text-xs text-slate-400">{p.position}</div>
+            <div className="text-xs text-slate-400">
+              {p.position1}
+              {p.position2 ? ` / ${p.position2}` : ""}
+            </div>
           </div>
           {status === "SOLD" ? (
             <span className="font-mono text-accent-gold">

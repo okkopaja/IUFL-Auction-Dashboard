@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuctionStats, useTeams } from "@/hooks/useAuction";
 import { ROUTES } from "@/lib/constants";
+import type { Team } from "@/types";
+import { AuthBar } from "../shared/AuthBar";
 import { ErrorState } from "../shared/ErrorState";
 import { LoadingState } from "../shared/LoadingState";
-import { ThemeToggle } from "../shared/ThemeToggle";
 import { Button } from "../ui/button";
 import { TeamGrid } from "./TeamGrid";
-import type { Team } from "@/types";
 
 function filterTeams(teams: Team[], query: string): Team[] {
   const q = query.trim().toLowerCase();
@@ -45,9 +45,9 @@ export function DashboardView() {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 z-10 relative mt-8">
-      {/* Theme toggle — top-right corner */}
+      {/* Auth bar — top-right corner */}
       <div className="absolute top-0 right-0 z-50">
-        <ThemeToggle />
+        <AuthBar />
       </div>
 
       {/* Title */}
@@ -96,7 +96,9 @@ export function DashboardView() {
             <p className="text-xs text-slate-500 uppercase tracking-widest font-mono">
               Total Players
             </p>
-            <p className="text-3xl font-bold font-heading text-slate-100">200</p>
+            <p className="text-3xl font-bold font-heading text-slate-100">
+              200
+            </p>
           </div>
 
           {/* Sold Players link */}

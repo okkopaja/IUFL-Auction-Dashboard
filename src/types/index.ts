@@ -3,13 +3,17 @@ export type PlayerStatus = "UNSOLD" | "IN_AUCTION" | "SOLD";
 export interface Player {
   id: string;
   name: string;
-  position: string;
+  position1: string;
+  position2?: string | null;
   basePrice: number;
   status: PlayerStatus;
   teamId?: string | null;
   transactionAmount?: number | null;
   imageUrl?: string | null;
   year?: string | null;
+  whatsappNumber?: string;
+  stream?: string;
+  importOrder?: number;
   team?: Team | null;
 }
 

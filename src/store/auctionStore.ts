@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { AUCTION_START_BID } from "@/lib/constants";
 
 interface AuctionState {
   currentBid: number;
@@ -11,7 +12,7 @@ interface AuctionState {
     teamId: string;
     amount: number;
   }) => void;
-  resetForNewPlayer: (basePrice: number) => void;
+  resetForNewPlayer: () => void;
 }
 
 export const useAuctionStore = create<AuctionState>((set) => ({
@@ -21,6 +22,6 @@ export const useAuctionStore = create<AuctionState>((set) => ({
   setBid: (bid) => set({ currentBid: bid }),
   setSelectedTeamId: (teamId) => set({ selectedTeamId: teamId }),
   setLastTransaction: (tx) => set({ lastTransaction: tx }),
-  resetForNewPlayer: (basePrice) =>
-    set({ currentBid: basePrice, selectedTeamId: null }),
+  resetForNewPlayer: () =>
+    set({ currentBid: AUCTION_START_BID, selectedTeamId: null }),
 }));

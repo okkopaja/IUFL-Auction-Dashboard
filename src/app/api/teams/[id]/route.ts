@@ -1,27 +1,48 @@
 import { NextResponse } from "next/server";
-import { MOCK_TEAMS, MOCK_PLAYERS } from "@/app/api/_mockData";
+import { logger } from "@/lib/logger";
+import { getSupabaseServerClient } from "@/lib/supabase";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const team = MOCK_TEAMS.find((t) => t.id === id || t.slug === id);
-  if (!team)
-    return NextResponse.json(
-      { success: false, error: "Not found" },
-      { status: 404 },
-    );
+  try {
+    const { id } = await params;
+    const supabase = await getSupabaseServerClient();
 
-  const players = MOCK_PLAYERS.filter((p) => p.teamId === team.id);
-  return NextResponse.json({
-    success: true,
-    data: {
-      ...team,
-      pointsRemaining: team.pointsTotal - team.pointsSpent,
-      playersOwnedCount: players.length,
-      players,
-      transactions: [],
-    },
-  });
+    const { data: team, error } = await supabase
+      .from("Team")
+      .select(`
+        *,
+        players:Player(*),
+        transactions:Transaction(*)
+      `)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!team)
+      return NextResponse.json(
+        { success: false, error: "Not found" },
+        { status: 404 },
+      );
+
+    const players = team.players || [];
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...team,
+        pointsRemaining: team.pointsTotal - team.pointsSpent,
+        playersOwnedCount: players.length,
+        players,
+        transactions: team.transactions || [],
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to fetch team", error);
+    return NextResponse.json(
+      { success: false, error: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
 }

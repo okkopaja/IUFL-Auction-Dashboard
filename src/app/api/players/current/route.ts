@@ -1,7 +1,27 @@
 import { NextResponse } from "next/server";
-import { MOCK_PLAYERS } from "@/app/api/_mockData";
+import { logger } from "@/lib/logger";
+import { getSupabaseServerClient } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const current = MOCK_PLAYERS.find((p) => p.status === "IN_AUCTION") ?? null;
-  return NextResponse.json({ success: true, data: current });
+  try {
+    const supabase = await getSupabaseServerClient();
+
+    const { data: current, error } = await supabase
+      .from("Player")
+      .select("*")
+      .eq("status", "IN_AUCTION")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, data: current });
+  } catch (error) {
+    logger.error("Failed to fetch current player", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch current player" },
+      { status: 500 },
+    );
+  }
 }

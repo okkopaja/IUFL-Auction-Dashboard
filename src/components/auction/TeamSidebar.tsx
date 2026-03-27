@@ -12,7 +12,7 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto w-full flex flex-col gap-3 scrollbar-hide">
+    <div className="w-full flex flex-col scrollbar-hide">
       {sortedTeams.map((team) => {
         const isSelected = selectedTeamId === team.id;
         const color = TEAM_COLORS[team.shortCode] || "#ffffff";
@@ -21,39 +21,51 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
           <div
             key={team.id}
             onClick={() => setSelectedTeamId(team.id)}
-            className={`flex items-center justify-between p-4 rounded-[1.5rem] cursor-pointer transition-all border ${
-              isSelected
-                ? "bg-slate-800/80"
-                : "bg-pitch-800/30 hover:bg-pitch-800/60 border-slate-800/30 hover:border-slate-700/50"
+            className={`group relative flex items-center justify-between p-3 cursor-pointer transition-colors border-b border-[#222] last:border-b-0 ${
+              isSelected ? "bg-[#1a1a1a]" : "hover:bg-[#161616]"
             }`}
-            style={{
-              borderColor: isSelected ? color : undefined,
-              boxShadow: isSelected ? `0 0 20px -5px ${color}60` : "none",
-            }}
           >
-            <div className="flex items-center gap-4">
-              <TeamLogo domain={team.domain} name={team.name} size={40} />
+            {/* Selection left border indicator */}
+            {isSelected && (
+              <div
+                className="absolute left-0 top-0 bottom-0 w-1 transition-all"
+                style={{ backgroundColor: color }}
+              />
+            )}
+
+            <div className="flex items-center gap-3 pl-2">
+              <TeamLogo domain={team.domain} name={team.name} size={32} />
               <div className="flex flex-col">
                 <span
-                  className={`font-bold text-sm tracking-wide ${isSelected ? "text-white" : "text-slate-200"}`}
+                  className={`font-semibold text-sm tracking-wide ${
+                    isSelected
+                      ? "text-white"
+                      : "text-slate-300 group-hover:text-white"
+                  }`}
                 >
                   {team.shortCode}
                 </span>
-                <span className="text-xs text-slate-500 font-mono mt-0.5">
-                  Pts:{" "}
-                  <span
-                    className={`${isSelected ? "text-accent-gold" : "text-slate-300"} font-bold`}
-                  >
-                    {team.pointsRemaining}
-                  </span>
-                </span>
                 <span className="text-[10px] text-slate-500 font-mono mt-0.5">
-                  Players:{" "}
-                  <span className="text-slate-300 font-bold">
+                  PLAYERS:{" "}
+                  <span className="text-slate-400">
                     {team.playersOwnedCount}
                   </span>
                 </span>
               </div>
+            </div>
+
+            <div className="flex flex-col items-end pr-1">
+              <span className="text-xs text-slate-500 font-mono tracking-widest uppercase">
+                Pts
+              </span>
+              <span
+                className={`font-mono font-medium text-sm tracking-tight ${
+                  isSelected ? "text-white" : "text-slate-300"
+                }`}
+                style={{ color: isSelected ? color : undefined }}
+              >
+                {team.pointsRemaining.toLocaleString()}
+              </span>
             </div>
           </div>
         );
