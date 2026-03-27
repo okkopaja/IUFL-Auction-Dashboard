@@ -5,7 +5,11 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
  * - /auction and all sub-paths  → live auction area
  * - /admin and all sub-paths    → admin panel (not linked anywhere; URL-only access)
  */
-const isProtectedRoute = createRouteMatcher(["/auction(.*)", "/admin(.*)"]);
+const isProtectedRoute = createRouteMatcher([
+  "/dashboard(.*)",
+  "/auction(.*)",
+  "/admin(.*)",
+]);
 
 export default clerkMiddleware(async (auth, request) => {
   if (isProtectedRoute(request)) {

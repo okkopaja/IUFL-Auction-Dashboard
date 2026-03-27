@@ -45,7 +45,8 @@ export default function Home() {
           className="mt-12"
         >
           <Link
-            href="/dashboard"
+            href="/sign-in?redirect_url=/dashboard"
+            prefetch={false}
             className="group relative inline-flex items-center justify-center gap-3 rounded-none bg-[#ccff00] px-10 py-5 text-sm font-bold uppercase tracking-widest text-black transition-all hover:bg-[#e0ff33] active:scale-95 overflow-hidden ring-1 ring-white/10"
           >
             {/* Structural corner accents */}
