@@ -8,23 +8,15 @@ import { TeamLogo } from "../shared/TeamLogo";
 export function TeamBubble({ team }: { team: Team }) {
   const accentColor = TEAM_COLORS[team.shortCode] || "#ffffff";
   return (
-    <Link href={ROUTES.TEAM(team.slug)}>
+    <Link href={ROUTES.TEAM(team.id)}>
       <div
-        className="group relative flex flex-col items-center justify-center p-6 rounded-2xl bg-pitch-900 border border-slate-800 transition-all duration-300 hover:scale-[1.05] hover:border-transparent hover:-translate-y-1 overflow-hidden"
+        className="group relative flex flex-col items-center justify-center p-6 rounded-2xl bg-pitch-900 border border-slate-800 transition-all duration-300 hover:scale-[1.05] hover:border-slate-600 hover:-translate-y-1 overflow-hidden"
         style={{
           boxShadow: `0 4px 20px -5px rgba(0,0,0,0.5)`,
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = `0 10px 40px -10px ${accentColor}40`;
-          e.currentTarget.style.borderColor = accentColor;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = `0 4px 20px -5px rgba(0,0,0,0.5)`;
-          e.currentTarget.style.borderColor = "rgba(30,34,51,0.5)";
-        }}
       >
         <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-gradient-to-t from-transparent"
+          className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity bg-linear-to-t from-transparent"
           style={{
             backgroundImage: `linear-gradient(to top, transparent, ${accentColor})`,
           }}

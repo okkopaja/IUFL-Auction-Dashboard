@@ -1,15 +1,10 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
-
-const geistSans = Geist({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-mono",
@@ -19,6 +14,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "IUFL 2026 Player Auction",
   description: "IUFL 2026 Player Auction Dashboard",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "IUFL Auction",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#080a0f",
 };
 
 export default function RootLayout({
@@ -27,13 +35,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider afterSignOutUrl="/dashboard">
+    <ClerkProvider afterSignOutUrl="/">
       <html
         lang="en"
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        className={`${geistMono.variable} dark antialiased`}
         suppressHydrationWarning
       >
-        <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <body
+          className="flex flex-col font-sans overflow-x-hidden"
+          suppressHydrationWarning
+        >
           <ThemeProvider>
             <QueryProvider>{children}</QueryProvider>
             <Toaster />

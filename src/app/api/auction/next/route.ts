@@ -1,34 +1,60 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { advanceToNextPlayer } from "@/lib/auctionProgression";
+import { requireAuctionAccess } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export async function POST() {
   // ── Auth guard ──────────────────────────────────────────────────────────
-  const denied = await requireAdmin();
+  const denied = await requireAuctionAccess();
   if (denied) return denied;
   // ────────────────────────────────────────────────────────────────────────
 
   try {
-    const supabase = await getSupabaseServerClient();
+    const supabase = getSupabaseAdminClient();
 
-    // Find next unsold player assuming there isn't a current one
-    const { data: nextUnsold, error } = await supabase
-      .from("Player")
-      .select("*")
-      .eq("status", "UNSOLD")
-      .order("importOrder")
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
       .limit(1)
       .maybeSingle();
 
-    if (error) throw error;
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "No active auction session found" },
+        { status: 404 },
+      );
+    }
 
-    if (nextUnsold) {
-      await supabase
-        .from("Player")
-        .update({ status: "IN_AUCTION" })
-        .eq("id", nextUnsold.id);
-      nextUnsold.status = "IN_AUCTION";
+    const { data: currentInAuction, error: currentPlayerError } = await supabase
+      .from("Player")
+      .select("id,updatedAt,importOrder")
+      .eq("sessionId", session.id)
+      .eq("status", "IN_AUCTION")
+      .order("updatedAt", { ascending: false })
+      .order("importOrder", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (currentPlayerError) throw currentPlayerError;
+
+    const nextUnsold = await advanceToNextPlayer(supabase, session.id);
+
+    if (currentInAuction) {
+      const { error: historyError } = await supabase
+        .from("AuctionActionHistory")
+        .insert({
+          id: crypto.randomUUID(),
+          sessionId: session.id,
+          fromPlayerId: currentInAuction.id,
+          toPlayerId: nextUnsold?.id ?? null,
+          actionType: "PASS",
+          transactionId: null,
+        });
+
+      if (historyError) throw historyError;
     }
 
     return NextResponse.json({

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model AuctionSession {
@@ -17,6 +16,9 @@ model AuctionSession {
   teams        Team[]
   players      Player[]
   transactions Transaction[]
+  actionHistory AuctionActionHistory[]
+  imageIngestionRuns ImportImageIngestionRun[]
+  imageIngestionJobs ImportImageIngestionJob[]
 }
 
 model Team {
@@ -29,6 +31,7 @@ model Team {
   sessionId        String
   session          AuctionSession @relation(fields: [sessionId], references: [id])
   players          Player[]
+  roleProfiles     TeamRoleProfile[]
   transactions     Transaction[]
   createdAt        DateTime       @default(now())
 
@@ -42,14 +45,17 @@ model Player {
   position2       String?
   year            String?
   imageUrl        String?
-  basePrice       Int            @default(50)
+  basePrice       Int            @default(10)
   status          PlayerStatus   @default(UNSOLD)
   teamId          String?
   team            Team?          @relation(fields: [teamId], references: [id])
   sessionId       String
   session         AuctionSession @relation(fields: [sessionId], references: [id])
   transactions    Transaction[]
-  whatsappNumber  String         @default("")
+  actionHistoryFrom AuctionActionHistory[] @relation("AuctionActionFromPlayer")
+  actionHistoryTo AuctionActionHistory[] @relation("AuctionActionToPlayer")
+  imageIngestionJobs ImportImageIngestionJob[]
+  whatsappNumber  String?
   stream          String         @default("")
   importOrder     Int            @default(0)
   createdAt       DateTime       @default(now())
@@ -66,6 +72,113 @@ enum PlayerStatus {
   IN_AUCTION
 }
 
+enum TeamRole {
+  OWNER
+  CO_OWNER
+  CAPTAIN
+  MARQUEE
+}
+
+enum ImportImageRunStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+}
+
+enum ImportImageJobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum AuctionActionType {
+  PASS
+  SELL
+}
+
+model AuctionActionHistory {
+  id            String            @id @default(cuid())
+  sessionId     String
+  session       AuctionSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  fromPlayerId  String
+  fromPlayer    Player            @relation("AuctionActionFromPlayer", fields: [fromPlayerId], references: [id], onDelete: Cascade)
+  toPlayerId    String?
+  toPlayer      Player?           @relation("AuctionActionToPlayer", fields: [toPlayerId], references: [id], onDelete: SetNull)
+  actionType    AuctionActionType
+  transactionId String?           @unique
+  transaction   Transaction?      @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([actionType])
+  @@index([fromPlayerId, createdAt])
+  @@index([toPlayerId, createdAt])
+}
+
+model ImportImageIngestionRun {
+  id            String               @id @default(cuid())
+  sessionId     String
+  session       AuctionSession       @relation(fields: [sessionId], references: [id])
+  status        ImportImageRunStatus @default(PENDING)
+  totalJobs     Int                  @default(0)
+  completedJobs Int                  @default(0)
+  failedJobs    Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  jobs          ImportImageIngestionJob[]
+
+  @@index([sessionId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ImportImageIngestionJob {
+  id           String               @id @default(cuid())
+  runId        String
+  run          ImportImageIngestionRun @relation(fields: [runId], references: [id])
+  sessionId    String
+  session      AuctionSession       @relation(fields: [sessionId], references: [id])
+  playerId     String
+  player       Player               @relation(fields: [playerId], references: [id])
+  sourceUrl    String
+  sourceFileId String
+  sourceHash   String
+  storagePath  String?
+  status       ImportImageJobStatus @default(PENDING)
+  attemptCount Int                  @default(0)
+  maxAttempts  Int                  @default(3)
+  nextAttemptAt DateTime?
+  lastError    String?
+  contentType  String?
+  contentLength Int?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  @@unique([runId, playerId, sourceHash])
+  @@index([runId, status, nextAttemptAt])
+  @@index([sessionId, status, nextAttemptAt])
+  @@index([playerId])
+}
+
+model TeamRoleProfile {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  role      TeamRole
+  name      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, role])
+  @@index([teamId])
+}
+
 model Transaction {
   id        String         @id @default(cuid())
   playerId  String
@@ -74,6 +187,7 @@ model Transaction {
   team      Team           @relation(fields: [teamId], references: [id])
   sessionId String
   session   AuctionSession @relation(fields: [sessionId], references: [id])
+  actionHistory AuctionActionHistory?
   amount    Int
   createdAt DateTime       @default(now())
 

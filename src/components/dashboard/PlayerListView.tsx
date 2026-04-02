@@ -6,10 +6,10 @@ import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { usePlayers } from "@/hooks/useAuction";
 import { ROUTES } from "@/lib/constants";
+import { toDisplayImageUrl } from "@/lib/imageUrl";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types";
 import { LoadingState } from "../shared/LoadingState";
-import { ThemeToggle } from "../shared/ThemeToggle";
 
 const POSITION_COLORS: Record<string, string> = {
   GK: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
@@ -19,12 +19,16 @@ const POSITION_COLORS: Record<string, string> = {
   FWD: "text-red-400 bg-red-400/10 border-red-400/30",
 };
 
-function PlayerRowItem({
+function formatSoldAmount(amount: number | null | undefined): string {
+  return typeof amount === "number" ? `${amount} pts` : "-";
+}
+
+export function PlayerRowItem({
   player,
   status,
 }: {
   player: Player;
-  status: "SOLD" | "UNSOLD";
+  status: "SOLD" | "UNSOLD" | "ALL";
 }) {
   const pos1 = player.position1;
   const pos2 = player.position2;
@@ -37,15 +41,19 @@ function PlayerRowItem({
       "text-slate-400 bg-slate-400/10 border-slate-400/30")
     : null;
 
+  const isSoldStatus =
+    status === "SOLD" || (status === "ALL" && !!player.teamId);
+  const playerImageUrl = toDisplayImageUrl(player.imageUrl);
+
   return (
     <Dialog>
       <DialogTrigger className="w-full text-left outline-none cursor-pointer">
         <div className="flex items-center gap-4 p-4 rounded-xl bg-pitch-900/40 border border-slate-800/40 hover:border-slate-700/80 hover:bg-pitch-900/80 transition-all duration-200 group">
           {/* Avatar placeholder / initials */}
           <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-bold text-slate-300 flex-shrink-0 group-hover:border-slate-600 transition-colors overflow-hidden">
-            {player.imageUrl ? (
+            {playerImageUrl ? (
               <img
-                src={player.imageUrl}
+                src={playerImageUrl}
                 alt={player.name}
                 className="w-full h-full object-cover"
               />
@@ -54,13 +62,23 @@ function PlayerRowItem({
             )}
           </div>
 
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-lg text-slate-100 truncate leading-tight mb-1">
+          <div className="flex-1 min-w-0 flex flex-col items-start">
+            <p className="font-medium text-base sm:text-lg text-slate-100 truncate leading-tight mb-1 max-w-full">
               {player.name}
             </p>
-            <p className="text-[10px] text-slate-500 truncate uppercase tracking-widest">
-              {status === "SOLD" && player.team ? player.team.name : "Base"}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 truncate uppercase tracking-widest">
+                {isSoldStatus && player.team ? player.team.name : "Base"}
+              </span>
+              <span
+                className={cn(
+                  "text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border sm:hidden",
+                  pos1Class,
+                )}
+              >
+                {pos1}
+              </span>
+            </div>
           </div>
 
           <div className="hidden sm:flex items-center gap-2 px-4">
@@ -75,9 +93,9 @@ function PlayerRowItem({
           </div>
 
           <div className="text-right flex-shrink-0 min-w-[80px]">
-            {status === "SOLD" ? (
+            {isSoldStatus ? (
               <span className="font-mono text-base text-accent-gold font-bold drop-shadow">
-                {player.transactionAmount} pts
+                {formatSoldAmount(player.transactionAmount)}
               </span>
             ) : (
               <span className="font-mono text-base text-slate-300 font-medium">
@@ -98,10 +116,10 @@ function PlayerRowItem({
 
           <div className="flex flex-col items-center gap-4 mb-4 relative z-10 text-center">
             {/* Big Profile Picture */}
-            <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-slate-800 border-[8px] border-slate-800 flex items-center justify-center text-8xl font-black text-slate-400 flex-shrink-0 shadow-[0_0_50px_-5px_rgba(0,0,0,0.6)] overflow-hidden relative">
-              {player.imageUrl ? (
+            <div className="w-48 h-48 sm:w-72 sm:h-72 rounded-full bg-slate-800 border-[6px] sm:border-[8px] border-slate-800 flex items-center justify-center text-6xl sm:text-8xl font-black text-slate-400 flex-shrink-0 shadow-[0_0_50px_-5px_rgba(0,0,0,0.6)] overflow-hidden relative">
+              {playerImageUrl ? (
                 <img
-                  src={player.imageUrl}
+                  src={playerImageUrl}
                   alt={player.name}
                   className="w-full h-full object-cover"
                 />
@@ -144,13 +162,21 @@ function PlayerRowItem({
                     {pos2 || "N/A"}
                   </span>
                 </div>
+                <div className="flex justify-center items-center gap-3">
+                  <span className="text-sm font-black text-slate-500 tracking-widest w-8 text-right">
+                    ST
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold uppercase tracking-widest px-5 py-1.5 rounded-lg border min-w-22.5 text-center text-slate-300 bg-slate-800/30 border-slate-700/50">
+                    {player.stream || "N/A"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Bottom Info Grid */}
           <div className="pt-5 border-t border-slate-800 w-full relative z-10 grid grid-cols-2 gap-6 bg-slate-900/50 -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 px-6 sm:px-8 pb-6 sm:pb-8 rounded-b-3xl mt-6">
-            {status === "SOLD" ? (
+            {isSoldStatus ? (
               <>
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 font-bold">
@@ -168,7 +194,7 @@ function PlayerRowItem({
                     Sold For
                   </p>
                   <p className="font-mono font-bold text-2xl sm:text-3xl text-accent-gold drop-shadow-md">
-                    {player.transactionAmount} pts
+                    {formatSoldAmount(player.transactionAmount)}
                   </p>
                 </div>
               </>
@@ -221,13 +247,12 @@ export function PlayerListView({ status }: { status: "SOLD" | "UNSOLD" }) {
         {/* Header row */}
         <div className="flex items-center justify-between">
           <Link
-            href={ROUTES.DASHBOARD}
+            href={ROUTES.PLAYERS}
             className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium"
           >
             <ArrowLeft className="w-4 h-4" />
-            Dashboard
+            Players
           </Link>
-          <ThemeToggle />
         </div>
 
         {/* Title */}
@@ -260,6 +285,7 @@ export function PlayerListView({ status }: { status: "SOLD" | "UNSOLD" }) {
           />
           {query && (
             <button
+              type="button"
               onClick={() => setQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
             >

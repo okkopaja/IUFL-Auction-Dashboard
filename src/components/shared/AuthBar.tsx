@@ -3,13 +3,12 @@
 import { UserButton, useAuth } from "@clerk/nextjs";
 import { LogIn } from "lucide-react";
 import Link from "next/link";
-import { ThemeToggle } from "./ThemeToggle";
 
 /**
- * Top-right auth cluster for the public /dashboard page.
+ * Top-right auth cluster for public pages.
  *
- * - Unauthenticated → ThemeToggle + gold "Sign In" button (Clerk modal)
- * - Authenticated   → ThemeToggle + Clerk UserButton (avatar/dropdown)
+ * - Unauthenticated → gold "Sign In" button (Clerk modal)
+ * - Authenticated   → Clerk UserButton (avatar/dropdown)
  *
  * Uses useAuth() hook (client-safe) instead of the server-only <Show> component.
  */
@@ -18,8 +17,6 @@ export function AuthBar() {
 
   return (
     <div className="flex items-center gap-2">
-      <ThemeToggle />
-
       {/* Skeleton while Clerk initialises to prevent layout shift */}
       {!isLoaded && (
         <div className="size-8 rounded-full bg-slate-700/40 animate-pulse" />
@@ -27,7 +24,7 @@ export function AuthBar() {
 
       {isLoaded && !isSignedIn && (
         <Link
-          href="/sign-in"
+          href="/v1/public/sign-in"
           id="sign-in-btn"
           className="
             group flex items-center gap-2 px-4 py-1.5 rounded-full

@@ -2,14 +2,21 @@
 export const REQUIRED_HEADERS = [
   "NAME",
   "YEAR",
-  "Whatsapp Number",
   "STREAM",
   "Primary Position",
 ] as const;
 
+/** Optional CSV headers accepted when present (case-sensitive). */
 export const OPTIONAL_HEADERS = [
-  "Secondary Postion", // intentional typo in source data
+  "Whatsapp Number",
+  "Secondary Position",
+  "Image URL",
 ] as const;
+
+/** Legacy header aliases accepted only for normalization compatibility. */
+export const LEGACY_HEADER_ALIASES = {
+  "Secondary Postion": "Secondary Position",
+} as const;
 
 /** Maps CSV column header → internal DB field name */
 export const FIELD_MAPPING: Record<string, string> = {
@@ -18,7 +25,13 @@ export const FIELD_MAPPING: Record<string, string> = {
   "Whatsapp Number": "whatsappNumber",
   STREAM: "stream",
   "Primary Position": "position1",
+  "Secondary Position": "position2",
   "Secondary Postion": "position2",
+  "Image URL": "imageUrl",
 };
 
-export const ALL_HEADERS = [...REQUIRED_HEADERS, ...OPTIONAL_HEADERS] as const;
+export const ALL_HEADERS = [
+  ...REQUIRED_HEADERS,
+  ...OPTIONAL_HEADERS,
+  ...Object.keys(LEGACY_HEADER_ALIASES),
+] as const;

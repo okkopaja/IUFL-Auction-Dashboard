@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { PLAYER_BASE_PRICE } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { getSupabaseServerClient } from "@/lib/supabase";
+import { mapTeamRoleProfiles } from "@/lib/teamRoles";
+import { withTransactionAmounts } from "@/lib/transactionAmounts";
 
 export async function GET(
   _req: Request,
@@ -15,6 +18,7 @@ export async function GET(
       .select(`
         *,
         players:Player(*),
+        roleProfiles:TeamRoleProfile(*),
         transactions:Transaction(*)
       `)
       .eq("id", id)
@@ -27,14 +31,26 @@ export async function GET(
         { status: 404 },
       );
 
-    const players = team.players || [];
+    const players = withTransactionAmounts(
+      (team.players || []).map((player) => ({
+        ...player,
+        basePrice: PLAYER_BASE_PRICE,
+      })),
+      (team.transactions || []).map((transaction) => ({
+        playerId: transaction.playerId,
+        amount: transaction.amount,
+        createdAt: transaction.createdAt,
+      })),
+    );
     return NextResponse.json({
       success: true,
       data: {
         ...team,
+        ...mapTeamRoleProfiles(team.roleProfiles ?? []),
         pointsRemaining: team.pointsTotal - team.pointsSpent,
         playersOwnedCount: players.length,
         players,
+        roleProfiles: team.roleProfiles || [],
         transactions: team.transactions || [],
       },
     });

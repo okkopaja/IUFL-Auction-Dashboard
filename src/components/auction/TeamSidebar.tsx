@@ -1,4 +1,5 @@
 import { TEAM_COLORS } from "@/lib/constants";
+import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
 import { useAuctionStore } from "@/store/auctionStore";
 import type { Team } from "@/types";
 import { TeamLogo } from "../shared/TeamLogo";
@@ -12,10 +13,14 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
   );
 
   return (
-    <div className="w-full flex flex-col scrollbar-hide">
+    <div className="w-full h-full overflow-y-auto flex flex-col scrollbar-hide">
       {sortedTeams.map((team) => {
         const isSelected = selectedTeamId === team.id;
         const color = TEAM_COLORS[team.shortCode] || "#ffffff";
+        const teamConstraints = calculateTeamBidConstraints({
+          pointsRemaining: team.pointsRemaining,
+          playersOwnedCount: team.playersOwnedCount,
+        });
 
         return (
           <div
@@ -49,6 +54,12 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
                   PLAYERS:{" "}
                   <span className="text-slate-400">
                     {team.playersOwnedCount}
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono mt-0.5 uppercase tracking-wide">
+                  Max Bid:{" "}
+                  <span className="text-slate-300">
+                    {teamConstraints.maxAllowedBid.toLocaleString()}
                   </span>
                 </span>
               </div>

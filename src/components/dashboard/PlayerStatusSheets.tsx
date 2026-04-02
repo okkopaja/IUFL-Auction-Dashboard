@@ -14,10 +14,14 @@ import {
   SheetTrigger,
 } from "../ui/sheet";
 
+function formatSoldAmount(amount: number | null | undefined): string {
+  return typeof amount === "number" ? `${amount}` : "-";
+}
+
 export function PlayerStatusSheets({
   soldCount,
   unsoldCount,
-  totalPlayers = 200,
+  totalPlayers = 0,
 }: {
   soldCount?: number;
   unsoldCount?: number;
@@ -131,7 +135,7 @@ function PlayerListContent({
           </div>
           {status === "SOLD" ? (
             <span className="font-mono text-accent-gold">
-              {p.transactionAmount}
+              {formatSoldAmount(p.transactionAmount)}
             </span>
           ) : (
             <span className="font-mono text-slate-500">{p.basePrice}</span>

@@ -11,6 +11,6 @@ export async function GET(req: Request) {
     await client.sessions.revokeSession(sessionId);
   }
 
-  const url = new URL("/sign-in?message=signup_success", req.url);
+  const url = new URL("/v1/public/sign-in?message=signup_success", req.url);
   return NextResponse.redirect(url);
 }

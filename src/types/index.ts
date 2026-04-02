@@ -1,4 +1,21 @@
 export type PlayerStatus = "UNSOLD" | "IN_AUCTION" | "SOLD";
+export type TeamRole = "OWNER" | "CO_OWNER" | "CAPTAIN" | "MARQUEE";
+export type AuctionActionType = "PASS" | "SELL";
+
+export interface TeamRoleProfile {
+  id: string;
+  teamId: string;
+  role: TeamRole;
+  name?: string | null;
+  imageUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamRoleSlot {
+  name?: string | null;
+  imageUrl?: string | null;
+}
 
 export interface Player {
   id: string;
@@ -11,7 +28,7 @@ export interface Player {
   transactionAmount?: number | null;
   imageUrl?: string | null;
   year?: string | null;
-  whatsappNumber?: string;
+  whatsappNumber?: string | null;
   stream?: string;
   importOrder?: number;
   team?: Team | null;
@@ -19,7 +36,6 @@ export interface Player {
 
 export interface Team {
   id: string;
-  slug: string;
   name: string;
   shortCode: string;
   domain: string;
@@ -28,6 +44,11 @@ export interface Team {
   pointsRemaining: number;
   playersOwnedCount: number;
   sessionId: string;
+  owner?: TeamRoleSlot;
+  coOwner?: TeamRoleSlot;
+  captain?: TeamRoleSlot;
+  marquee?: TeamRoleSlot;
+  roleProfiles?: TeamRoleProfile[];
   players: Player[];
   transactions: Transaction[];
 }
@@ -42,6 +63,28 @@ export interface Transaction {
   team: Team;
 }
 
+export interface AuctionActionHistoryEntry {
+  id: string;
+  actionType: AuctionActionType;
+  createdAt: string;
+  fromPlayer: Player;
+  toPlayer: Player | null;
+  transaction: Transaction | null;
+}
+
+export type PreviousActionMode = "SELL_PREVIEW" | "PASS_REVERTED";
+
+export type PreviousActionResponse =
+  | {
+      mode: "SELL_PREVIEW";
+      entry: AuctionActionHistoryEntry;
+    }
+  | {
+      mode: "PASS_REVERTED";
+      consumedActionId: string;
+      currentPlayer: Player;
+    };
+
 export interface AuctionSession {
   id: string;
   name: string;
@@ -53,4 +96,5 @@ export interface AuctionStats {
   unsoldCount: number;
   totalSpent: number;
   totalTeams: number;
+  totalPlayers: number;
 }

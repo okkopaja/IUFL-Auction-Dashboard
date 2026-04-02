@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
+import { requireAuctionAccess } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const denied = await requireAuctionAccess();
+  if (denied) return denied;
+
   try {
-    const supabase = await getSupabaseServerClient();
+    const supabase = getSupabaseAdminClient();
 
     const { data: logs, error } = await supabase
       .from("Transaction")

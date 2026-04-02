@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { AUCTION_TEAM_COUNT } from "@/lib/auctionTeams";
+import { requireAuctionAccess } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const denied = await requireAuctionAccess();
+  if (denied) return denied;
+
   try {
-    const supabase = await getSupabaseServerClient();
+    const supabase = getSupabaseAdminClient();
 
     const [playersRes, txRes] = await Promise.all([
       supabase.from("Player").select("status"),
@@ -24,11 +29,12 @@ export async function GET() {
       (p) => p.status === "UNSOLD" || p.status === "IN_AUCTION",
     ).length;
     const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalTeams = 16;
+    const totalTeams = AUCTION_TEAM_COUNT;
+    const totalPlayers = players.length;
 
     return NextResponse.json({
       success: true,
-      data: { soldCount, unsoldCount, totalSpent, totalTeams },
+      data: { soldCount, unsoldCount, totalSpent, totalTeams, totalPlayers },
     });
   } catch (error) {
     logger.error("Failed to fetch stats", error);

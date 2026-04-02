@@ -16,6 +16,7 @@ export function PageTransition({
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
       className={className}
+      suppressHydrationWarning
     >
       {children}
     </motion.div>

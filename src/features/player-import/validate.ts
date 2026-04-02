@@ -1,5 +1,50 @@
 import { REQUIRED_HEADERS } from "./constants";
-import type { ImportDraftRow, RawCsvRow } from "./types";
+import { normalizePlayerIdentityKey } from "./normalize";
+import type { ImportDraftRow } from "./types";
+
+export interface RemoveCsvDuplicatesResult {
+  rows: ImportDraftRow[];
+  removedCount: number;
+}
+
+/**
+ * Drop duplicate CSV rows by normalized player identity.
+ * The first matching row is kept and later duplicates are removed.
+ */
+export function removeCsvDuplicates(
+  rows: ImportDraftRow[],
+): RemoveCsvDuplicatesResult {
+  const seenIdentityKeys = new Set<string>();
+  const deduplicatedRows: ImportDraftRow[] = [];
+  let removedCount = 0;
+
+  for (const row of rows) {
+    if (!row.name.trim()) {
+      deduplicatedRows.push(row);
+      continue;
+    }
+
+    const identityKey = normalizePlayerIdentityKey(
+      row.name,
+      row.whatsappNumber,
+    );
+    if (seenIdentityKeys.has(identityKey)) {
+      removedCount += 1;
+      continue;
+    }
+
+    seenIdentityKeys.add(identityKey);
+    deduplicatedRows.push(row);
+  }
+
+  return {
+    rows: deduplicatedRows.map((row, index) => ({
+      ...row,
+      importOrder: index,
+    })),
+    removedCount,
+  };
+}
 
 /** Validate a draft row; returns the row with errors populated. */
 export function validateRow(
@@ -10,17 +55,15 @@ export function validateRow(
 
   if (!row.name) errors.name = "Name is required";
   if (!row.year) errors.year = "Year is required";
-  if (!row.whatsappNumber)
-    errors.whatsappNumber = "WhatsApp number is required";
   if (!row.stream) errors.stream = "Stream is required";
   if (!row.position1) errors.position1 = "Primary position is required";
 
-  // Duplicate detection: same name + whatsappNumber elsewhere
+  // Duplicate detection: same normalized identity elsewhere.
+  const rowKey = normalizePlayerIdentityKey(row.name, row.whatsappNumber);
   const duplicateIdx = allRows.findIndex(
     (r) =>
       r._key !== row._key &&
-      r.name.toLowerCase() === row.name.toLowerCase() &&
-      r.whatsappNumber === row.whatsappNumber,
+      normalizePlayerIdentityKey(r.name, r.whatsappNumber) === rowKey,
   );
   if (duplicateIdx !== -1) {
     errors.name = `Duplicate of row ${duplicateIdx + 1}`;

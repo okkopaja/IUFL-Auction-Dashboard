@@ -7,17 +7,29 @@ import {
   AlertCircle,
   ChevronRight,
   Gavel,
+  Image,
   LogOut,
   RefreshCw,
+  RotateCcw,
   Shield,
   ShieldCheck,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ROUTES } from "@/lib/constants";
+import { IconsImportPanel } from "./icons-import/IconsImportPanel";
 import { PlayerImportPanel } from "./player-import/PlayerImportPanel";
 import { AdminPlayersBlock } from "./players/AdminPlayersBlock";
-import { AdminTeamsBlock } from "./teams/AdminTeamsBlock";
 
 interface TransactionLog {
   id: string;
@@ -50,6 +62,9 @@ export function AdminDashboardView() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [stats, setStats] = useState<AuctionStats | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
+  const [isResettingSession, setIsResettingSession] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
   const [logsLoading, setLogsLoading] = useState(true);
 
   // ── Data fetching ──────────────────────────────────────────────────────
@@ -94,8 +109,54 @@ export function AdminDashboardView() {
     }
   };
 
+  const handleResetDialogChange = (open: boolean) => {
+    if (isResettingSession) return;
+    setIsResetDialogOpen(open);
+    if (!open) {
+      setResetPassword("");
+    }
+  };
+
+  const handleResetSession = async () => {
+    if (resetPassword.length === 0) {
+      toast.error("Enter your password to confirm reset");
+      return;
+    }
+
+    setIsResettingSession(true);
+    try {
+      const res = await postJson("/api/admin/auction/reset", {
+        password: resetPassword,
+      });
+      if (!res.success) throw new Error(res.error);
+
+      toast.success("Auction session reset. All players are now unsold.");
+
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["auction-current"] }),
+        qc.invalidateQueries({ queryKey: ["teams"] }),
+        qc.invalidateQueries({ queryKey: ["team"] }),
+        qc.invalidateQueries({ queryKey: ["players"] }),
+        qc.invalidateQueries({ queryKey: ["currentPlayer"] }),
+        qc.invalidateQueries({ queryKey: ["auctionLog"] }),
+        qc.invalidateQueries({ queryKey: ["auctionStats"] }),
+        qc.invalidateQueries({ queryKey: ["admin-teams"] }),
+      ]);
+
+      await fetchData();
+      setIsResetDialogOpen(false);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to reset session",
+      );
+    } finally {
+      setIsResettingSession(false);
+      setResetPassword("");
+    }
+  };
+
   const handleSignOut = () => {
-    signOut({ redirectUrl: "/dashboard" });
+    signOut({ redirectUrl: "/" });
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -239,21 +300,112 @@ export function AdminDashboardView() {
               {isAdvancing ? "Advancing…" : "Advance Next Player"}
             </button>
 
-            {/* Placeholder — extend as needed */}
             <button
               type="button"
-              disabled
-              title="Coming soon"
+              id="admin-reset-session-btn"
+              onClick={() => setIsResetDialogOpen(true)}
+              disabled={isResettingSession}
               className="
                 flex items-center gap-2 px-5 py-2.5 rounded-xl
-                bg-slate-800/60 border border-slate-700/60 text-slate-500
-                cursor-not-allowed text-sm font-semibold tracking-wide
+                bg-red-500/20 border border-red-500/40 text-red-200
+                hover:bg-red-500/30 hover:border-red-400
+                text-sm font-semibold tracking-wide
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-all duration-200
               "
             >
-              <AlertCircle className="size-4" />
-              Reset Session (soon)
+              <RotateCcw
+                className={`size-4 ${isResettingSession ? "animate-spin" : ""}`}
+              />
+              {isResettingSession ? "Resetting…" : "Reset Session"}
             </button>
           </div>
+        </div>
+
+        <Dialog open={isResetDialogOpen} onOpenChange={handleResetDialogChange}>
+          <DialogContent
+            showCloseButton={!isResettingSession}
+            className="max-w-lg bg-pitch-900 border-slate-800 text-slate-200 p-0 overflow-hidden sm:rounded-2xl shadow-2xl"
+          >
+            <DialogHeader className="px-6 pt-6 pb-2">
+              <DialogTitle className="text-xl font-bold text-slate-100">
+                Reset Auction Session
+              </DialogTitle>
+              <DialogDescription className="text-slate-500">
+                This action is destructive and cannot be undone. Confirm your
+                password to proceed.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleResetSession();
+              }}
+              className="px-6 pb-6 flex flex-col gap-4"
+            >
+              <div className="rounded-xl border border-red-500/30 bg-red-950/20 px-4 py-3 text-sm text-red-200">
+                <p className="font-semibold flex items-center gap-2">
+                  <AlertCircle className="size-4 text-red-300" />
+                  This will immediately reset the active auction session.
+                </p>
+                <p className="mt-2 text-red-200/90">
+                  All sold players will be reverted to unsold, all team spending
+                  will reset, and every transaction log entry will be deleted.
+                </p>
+                <p className="mt-2 text-red-200/90">
+                  Teams, player records, and owner/co-owner/captain/marquee role
+                  profiles will be preserved.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="reset-session-password"
+                  className="text-xs text-slate-500 uppercase tracking-widest"
+                >
+                  Confirm your password
+                </label>
+                <input
+                  id="reset-session-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={resetPassword}
+                  onChange={(event) => setResetPassword(event.target.value)}
+                  disabled={isResettingSession}
+                  placeholder="Enter your account password"
+                  className="w-full bg-pitch-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-red-400/60 focus:ring-1 focus:ring-red-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleResetDialogChange(false)}
+                  disabled={isResettingSession}
+                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResettingSession || resetPassword.length === 0}
+                  className="px-4 py-2 rounded-lg border border-red-500/50 bg-red-500/20 text-red-200 hover:bg-red-500/30 hover:border-red-400 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResettingSession ? "Resetting…" : "Reset Session"}
+                </button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Icons Import ─────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-800 bg-pitch-900/50 backdrop-blur-md p-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2 text-slate-300 font-semibold">
+            <Image className="size-5 text-accent-gold" />
+            Icons Import
+          </div>
+          <IconsImportPanel />
         </div>
 
         {/* ── Player Import ────────────────────────────────────────────── */}
@@ -272,7 +424,22 @@ export function AdminDashboardView() {
               <Shield className="size-5 text-accent-blue" />
               Teams
             </div>
-            <AdminTeamsBlock />
+
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Team member editing now lives in a dedicated Teams section with
+              drag-and-drop image upload, previews, and role configuration.
+            </p>
+
+            <Link href={ROUTES.ADMIN_TEAMS} className="block w-full">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 border-slate-700 bg-slate-900/30 text-slate-200 hover:border-slate-500 hover:bg-slate-800/60 justify-between"
+              >
+                Open Teams Section
+                <ChevronRight className="size-4 text-accent-gold" />
+              </Button>
+            </Link>
           </div>
 
           {/* ── Players ────────────────────────────────────────────────────── */}
@@ -298,8 +465,8 @@ export function AdminDashboardView() {
             </span>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Log Views (Table for desktop, Cards for mobile) */}
+          <div className="w-full">
             {logsLoading ? (
               <div className="px-6 py-10 text-center text-slate-500 text-sm animate-pulse">
                 Loading transactions…
@@ -310,56 +477,101 @@ export function AdminDashboardView() {
                 No transactions yet
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-slate-500 uppercase tracking-widest font-mono border-b border-slate-800/60">
-                    <th className="px-6 py-3 text-left">Player</th>
-                    <th className="px-6 py-3 text-left">Team</th>
-                    <th className="px-6 py-3 text-right">Amount</th>
-                    <th className="px-6 py-3 text-right hidden md:table-cell">
-                      Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((tx, i) => (
-                    <tr
+              <>
+                {/* Mobile Card List */}
+                <div className="md:hidden flex flex-col gap-2 p-4">
+                  {logs.map((tx) => (
+                    <div
                       key={tx.id}
-                      className={`border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors ${
-                        i % 2 === 0 ? "" : "bg-pitch-900/30"
-                      }`}
+                      className="bg-pitch-900/50 border border-slate-800/80 rounded-xl p-4 flex flex-col gap-3"
                     >
-                      <td className="px-6 py-3 font-medium text-slate-200">
-                        {tx.player?.name ?? "—"}
-                        {tx.player?.role && (
-                          <span className="ml-2 text-xs text-slate-600 font-mono">
-                            {tx.player.role}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="font-mono text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold text-slate-200">
+                            {tx.player?.name ?? "—"}
+                          </div>
+                          {tx.player?.role && (
+                            <div className="text-xs text-slate-500 font-mono mt-0.5">
+                              {tx.player.role}
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-bold text-accent-gold font-mono text-lg">
+                          {tx.amount.toLocaleString()} pts
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-end border-t border-slate-800/40 pt-2 mt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded">
                             {tx.team?.shortCode ?? "?"}
                           </span>
-                          <span className="text-slate-300">
+                          <span className="text-xs text-slate-400">
                             {tx.team?.name ?? "Unknown"}
                           </span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-right font-bold text-accent-gold font-mono">
-                        {tx.amount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-3 text-right text-slate-600 text-xs font-mono hidden md:table-cell">
-                        {new Date(tx.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                    </tr>
+                        </div>
+                        <div className="text-[10px] text-slate-600 font-mono">
+                          {new Date(tx.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-slate-500 uppercase tracking-widest font-mono border-b border-slate-800/60">
+                        <th className="px-6 py-3 text-left">Player</th>
+                        <th className="px-6 py-3 text-left">Team</th>
+                        <th className="px-6 py-3 text-right">Amount</th>
+                        <th className="px-6 py-3 text-right">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logs.map((tx, i) => (
+                        <tr
+                          key={tx.id}
+                          className={`border-b border-slate-800/40 hover:bg-slate-800/20 transition-colors ${
+                            i % 2 === 0 ? "" : "bg-pitch-900/30"
+                          }`}
+                        >
+                          <td className="px-6 py-3 font-medium text-slate-200">
+                            {tx.player?.name ?? "—"}
+                            {tx.player?.role && (
+                              <span className="ml-2 text-xs text-slate-600 font-mono">
+                                {tx.player.role}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="font-mono text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                                {tx.team?.shortCode ?? "?"}
+                              </span>
+                              <span className="text-slate-300">
+                                {tx.team?.name ?? "Unknown"}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-right font-bold text-accent-gold font-mono">
+                            {tx.amount.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 text-right text-slate-600 text-xs font-mono">
+                            {new Date(tx.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>

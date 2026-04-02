@@ -11,8 +11,8 @@ export default function NotFound() {
       <p className="text-muted-foreground mb-8">
         We couldn't find the page you were looking for.
       </p>
-      <Link href="/dashboard">
-        <Button>Return to Dashboard</Button>
+      <Link href="/">
+        <Button>Return Home</Button>
       </Link>
     </div>
   );

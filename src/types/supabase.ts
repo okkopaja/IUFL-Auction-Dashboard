@@ -41,6 +41,200 @@ export type Database = {
         };
         Relationships: [];
       };
+      AuctionActionHistory: {
+        Row: {
+          actionType: Database["public"]["Enums"]["AuctionActionType"];
+          createdAt: string;
+          fromPlayerId: string;
+          id: string;
+          sessionId: string;
+          toPlayerId: string | null;
+          transactionId: string | null;
+        };
+        Insert: {
+          actionType: Database["public"]["Enums"]["AuctionActionType"];
+          createdAt?: string;
+          fromPlayerId: string;
+          id?: string;
+          sessionId: string;
+          toPlayerId?: string | null;
+          transactionId?: string | null;
+        };
+        Update: {
+          actionType?: Database["public"]["Enums"]["AuctionActionType"];
+          createdAt?: string;
+          fromPlayerId?: string;
+          id?: string;
+          sessionId?: string;
+          toPlayerId?: string | null;
+          transactionId?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "AuctionActionHistory_fromPlayerId_fkey";
+            columns: ["fromPlayerId"];
+            isOneToOne: false;
+            referencedRelation: "Player";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "AuctionActionHistory_sessionId_fkey";
+            columns: ["sessionId"];
+            isOneToOne: false;
+            referencedRelation: "AuctionSession";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "AuctionActionHistory_toPlayerId_fkey";
+            columns: ["toPlayerId"];
+            isOneToOne: false;
+            referencedRelation: "Player";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "AuctionActionHistory_transactionId_fkey";
+            columns: ["transactionId"];
+            isOneToOne: false;
+            referencedRelation: "Transaction";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ImportImageIngestionJob: {
+        Row: {
+          attemptCount: number;
+          contentLength: number | null;
+          contentType: string | null;
+          createdAt: string;
+          finishedAt: string | null;
+          id: string;
+          lastError: string | null;
+          maxAttempts: number;
+          nextAttemptAt: string | null;
+          playerId: string;
+          runId: string;
+          sessionId: string;
+          sourceFileId: string;
+          sourceHash: string;
+          sourceUrl: string;
+          startedAt: string | null;
+          status: Database["public"]["Enums"]["ImportImageJobStatus"];
+          storagePath: string | null;
+          updatedAt: string;
+        };
+        Insert: {
+          attemptCount?: number;
+          contentLength?: number | null;
+          contentType?: string | null;
+          createdAt?: string;
+          finishedAt?: string | null;
+          id: string;
+          lastError?: string | null;
+          maxAttempts?: number;
+          nextAttemptAt?: string | null;
+          playerId: string;
+          runId: string;
+          sessionId: string;
+          sourceFileId: string;
+          sourceHash: string;
+          sourceUrl: string;
+          startedAt?: string | null;
+          status?: Database["public"]["Enums"]["ImportImageJobStatus"];
+          storagePath?: string | null;
+          updatedAt?: string;
+        };
+        Update: {
+          attemptCount?: number;
+          contentLength?: number | null;
+          contentType?: string | null;
+          createdAt?: string;
+          finishedAt?: string | null;
+          id?: string;
+          lastError?: string | null;
+          maxAttempts?: number;
+          nextAttemptAt?: string | null;
+          playerId?: string;
+          runId?: string;
+          sessionId?: string;
+          sourceFileId?: string;
+          sourceHash?: string;
+          sourceUrl?: string;
+          startedAt?: string | null;
+          status?: Database["public"]["Enums"]["ImportImageJobStatus"];
+          storagePath?: string | null;
+          updatedAt?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ImportImageIngestionJob_playerId_fkey";
+            columns: ["playerId"];
+            isOneToOne: false;
+            referencedRelation: "Player";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ImportImageIngestionJob_runId_fkey";
+            columns: ["runId"];
+            isOneToOne: false;
+            referencedRelation: "ImportImageIngestionRun";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ImportImageIngestionJob_sessionId_fkey";
+            columns: ["sessionId"];
+            isOneToOne: false;
+            referencedRelation: "AuctionSession";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ImportImageIngestionRun: {
+        Row: {
+          completedJobs: number;
+          createdAt: string;
+          failedJobs: number;
+          finishedAt: string | null;
+          id: string;
+          sessionId: string;
+          startedAt: string | null;
+          status: Database["public"]["Enums"]["ImportImageRunStatus"];
+          totalJobs: number;
+          updatedAt: string;
+        };
+        Insert: {
+          completedJobs?: number;
+          createdAt?: string;
+          failedJobs?: number;
+          finishedAt?: string | null;
+          id: string;
+          sessionId: string;
+          startedAt?: string | null;
+          status?: Database["public"]["Enums"]["ImportImageRunStatus"];
+          totalJobs?: number;
+          updatedAt?: string;
+        };
+        Update: {
+          completedJobs?: number;
+          createdAt?: string;
+          failedJobs?: number;
+          finishedAt?: string | null;
+          id?: string;
+          sessionId?: string;
+          startedAt?: string | null;
+          status?: Database["public"]["Enums"]["ImportImageRunStatus"];
+          totalJobs?: number;
+          updatedAt?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ImportImageIngestionRun_sessionId_fkey";
+            columns: ["sessionId"];
+            isOneToOne: false;
+            referencedRelation: "AuctionSession";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       Player: {
         Row: {
           basePrice: number;
@@ -56,7 +250,7 @@ export type Database = {
           stream: string;
           teamId: string | null;
           updatedAt: string;
-          whatsappNumber: string;
+          whatsappNumber: string | null;
           year: string | null;
         };
         Insert: {
@@ -73,7 +267,7 @@ export type Database = {
           stream?: string;
           teamId?: string | null;
           updatedAt?: string;
-          whatsappNumber?: string;
+          whatsappNumber?: string | null;
           year?: string | null;
         };
         Update: {
@@ -90,7 +284,7 @@ export type Database = {
           stream?: string;
           teamId?: string | null;
           updatedAt?: string;
-          whatsappNumber?: string;
+          whatsappNumber?: string | null;
           year?: string | null;
         };
         Relationships: [
@@ -147,6 +341,44 @@ export type Database = {
             columns: ["sessionId"];
             isOneToOne: false;
             referencedRelation: "AuctionSession";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      TeamRoleProfile: {
+        Row: {
+          createdAt: string;
+          id: string;
+          imageUrl: string | null;
+          name: string | null;
+          role: Database["public"]["Enums"]["TeamRole"];
+          teamId: string;
+          updatedAt: string;
+        };
+        Insert: {
+          createdAt?: string;
+          id?: string;
+          imageUrl?: string | null;
+          name?: string | null;
+          role: Database["public"]["Enums"]["TeamRole"];
+          teamId: string;
+          updatedAt?: string;
+        };
+        Update: {
+          createdAt?: string;
+          id?: string;
+          imageUrl?: string | null;
+          name?: string | null;
+          role?: Database["public"]["Enums"]["TeamRole"];
+          teamId?: string;
+          updatedAt?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "TeamRoleProfile_teamId_fkey";
+            columns: ["teamId"];
+            isOneToOne: false;
+            referencedRelation: "Team";
             referencedColumns: ["id"];
           },
         ];
@@ -208,7 +440,15 @@ export type Database = {
       requesting_user_id: { Args: never; Returns: string };
     };
     Enums: {
+      AuctionActionType: "PASS" | "SELL";
+      ImportImageJobStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
+      ImportImageRunStatus:
+        | "PENDING"
+        | "PROCESSING"
+        | "COMPLETED"
+        | "COMPLETED_WITH_ERRORS";
       PlayerStatus: "UNSOLD" | "SOLD" | "IN_AUCTION";
+      TeamRole: "OWNER" | "CO_OWNER" | "CAPTAIN" | "MARQUEE";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -340,6 +580,7 @@ export const Constants = {
   public: {
     Enums: {
       PlayerStatus: ["UNSOLD", "SOLD", "IN_AUCTION"],
+      TeamRole: ["OWNER", "CO_OWNER", "CAPTAIN", "MARQUEE"],
     },
   },
 } as const;
