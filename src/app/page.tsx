@@ -8,6 +8,20 @@ import { ROUTES } from "@/lib/constants";
 export default function Home() {
   return (
     <main className="relative flex min-h-screen-safe w-full flex-col items-center justify-center overflow-x-hidden bg-[#080a0f] text-white font-sans">
+      {/* Attribution */}
+      <a
+        href="https://github.com/okkopaja"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute top-4 left-6 sm:top-6 sm:left-8 z-50 flex items-center gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-white/40 transition-colors hover:text-[#ccff00]"
+      >
+        <span className="flex items-center gap-1.5">
+          <span>Made with</span>
+          <span className="text-sm">🤖</span>
+          <span>by <span className="text-white/70">github.com/okkopaja</span></span>
+        </span>
+      </a>
+
       {/* Techy Background Pattern */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#13161e_1px,transparent_1px),linear-gradient(to_bottom,#13161e_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
@@ -15,18 +29,27 @@ export default function Home() {
 
       <div className="z-10 flex flex-col items-center max-w-5xl px-6 text-center">
         {/* Main Heading Text */}
-        <motion.h1
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
-          className="text-5xl sm:text-7xl md:text-8xl lg:text-[7rem] font-extrabold tracking-tighter text-white mb-6 leading-none"
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="relative mb-4 flex flex-col items-center justify-center pt-8"
           suppressHydrationWarning
         >
-          IUFL 2026
-          <span className="block text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-gray-500 mt-2">
-            PLAYER AUCTION
-          </span>
-        </motion.h1>
+          <h1 className="text-center font-black uppercase italic leading-[0.85] tracking-tighter sm:-skew-x-[4deg]">
+            <span className="block text-6xl text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] sm:text-8xl md:text-9xl lg:text-[9rem]">
+              IUFL{" "}
+              <span className="text-transparent outline-none [-webkit-text-stroke:2px_white] block sm:inline-block">
+                2026
+              </span>
+            </span>
+            <span className="relative mt-4 block bg-gradient-to-b from-[#ccff00] via-[#e6ff66] to-[#88aa00] bg-clip-text text-5xl text-transparent drop-shadow-[0_10px_30px_rgba(204,255,0,0.5)] sm:text-7xl md:text-8xl lg:text-[8rem]">
+              PLAYER AUCTION
+              {/* Decorative accent slash */}
+              <span className="absolute -bottom-2 -top-0 -left-6 hidden w-3 bg-[#ccff00] sm:block lg:-left-10 lg:w-4" />
+            </span>
+          </h1>
+        </motion.div>
 
         {/* Call to Action Buttons */}
         <motion.div
