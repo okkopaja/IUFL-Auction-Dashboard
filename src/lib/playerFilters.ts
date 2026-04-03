@@ -107,6 +107,8 @@ export function filterPlayersBySearch(
       player.name.toLowerCase().includes(normalizedQuery) ||
       player.position1?.toLowerCase().includes(normalizedQuery) ||
       player.position2?.toLowerCase().includes(normalizedQuery) ||
+      player.year?.toLowerCase().includes(normalizedQuery) ||
+      player.stream?.toLowerCase().includes(normalizedQuery) ||
       player.team?.shortCode?.toLowerCase().includes(normalizedQuery) ||
       player.team?.name?.toLowerCase().includes(normalizedQuery),
   );

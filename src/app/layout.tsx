@@ -42,7 +42,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <body
-          className="flex flex-col font-sans overflow-x-hidden"
+          className="flex flex-col font-sans overflow-x-clip min-h-[100dvh]"
           suppressHydrationWarning
         >
           <ThemeProvider>

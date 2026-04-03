@@ -10,6 +10,7 @@ export type ImportIssueCode =
   | "MISSING_REQUIRED_FIELD"
   | "CSV_DUPLICATE"
   | "DB_DUPLICATE"
+  | "ICON_PLAYER"
   | "INVALID_IMAGE_URL"
   | "DRIVE_URL_NON_PUBLIC"
   | "DRIVE_URL_CHECK_FAILED";
@@ -98,6 +99,7 @@ export interface ImportCheckSummary {
   warningRows: number;
   csvDuplicateRows: number;
   dbDuplicateRows: number;
+  iconRows: number;
   missingFieldRows: number;
   imageUrlIssueRows: number;
   missingHeaders: string[];
@@ -112,6 +114,7 @@ export interface ImportCheckResult {
   rows: ImportCheckRowResult[];
   summary: ImportCheckSummary;
   hasBlockingIssues: boolean;
+  existingIconPlayersInBaseCount?: number;
 }
 
 export interface ImportConflictResolution {

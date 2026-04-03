@@ -223,6 +223,9 @@ export function analyzeImportRows({
     dbDuplicateRows: analyzedRows.filter((row) =>
       row.issues.some((issue) => issue.code === "DB_DUPLICATE"),
     ).length,
+    iconRows: analyzedRows.filter((row) =>
+      row.issues.some((issue) => issue.code === "ICON_PLAYER"),
+    ).length,
     missingFieldRows: analyzedRows.filter((row) =>
       row.issues.some((issue) => issue.code === "MISSING_REQUIRED_FIELD"),
     ).length,

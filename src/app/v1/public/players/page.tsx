@@ -2,8 +2,11 @@
 
 import { ArrowLeft, ChevronDown, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { PlayerRowItem } from "@/components/dashboard/PlayerListView";
+import { UIEvent, useMemo, useState } from "react";
+import {
+  PlayerDetailsDialog,
+  PlayerRowItem,
+} from "@/components/dashboard/PlayerListView";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { usePlayers } from "@/hooks/useAuction";
 import { TRIAL_ABSENTEE_PLAYERS } from "@/lib/absenteePlayers";
@@ -15,10 +18,16 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function PlayersPage() {
+  const PLAYERS_PAGE_SIZE = 15;
   const { data: players = [], isLoading } = usePlayers();
   const [allPlayersQuery, setAllPlayersQuery] = useState("");
   const [isUnsoldAbsenteesOpen, setIsUnsoldAbsenteesOpen] = useState(false);
   const [viewOnlyQuery, setViewOnlyQuery] = useState("");
+  const [allPlayersVisibleCount, setAllPlayersVisibleCount] =
+    useState(PLAYERS_PAGE_SIZE);
+  const [selectedAllPlayer, setSelectedAllPlayer] = useState<
+    (typeof players)[number] | null
+  >(null);
 
   const groupedPlayers = useMemo(
     () => ({
@@ -34,6 +43,14 @@ export default function PlayersPage() {
     () => filterPlayersBySearch(players, allPlayersQuery),
     [players, allPlayersQuery],
   );
+
+  const visibleAllPlayers = useMemo(
+    () => filteredAllPlayers.slice(0, allPlayersVisibleCount),
+    [filteredAllPlayers, allPlayersVisibleCount],
+  );
+
+  const hasMoreAllPlayers =
+    visibleAllPlayers.length < filteredAllPlayers.length;
 
   const unsoldPlayers = useMemo(
     () => players.filter((player) => player.status === "UNSOLD"),
@@ -97,6 +114,32 @@ export default function PlayersPage() {
 
   const hasAllPlayersQuery = allPlayersQuery.trim().length > 0;
   const hasViewOnlyQuery = normalizedViewOnlyQuery.length > 0;
+
+  const handleAllPlayersQueryChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setAllPlayersQuery(event.target.value);
+    setAllPlayersVisibleCount(PLAYERS_PAGE_SIZE);
+    setSelectedAllPlayer(null);
+  };
+
+  const handleClearAllPlayersQuery = () => {
+    setAllPlayersQuery("");
+    setAllPlayersVisibleCount(PLAYERS_PAGE_SIZE);
+    setSelectedAllPlayer(null);
+  };
+
+  const handleAllPlayersScroll = (event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    const nearBottom =
+      target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+
+    if (!nearBottom || !hasMoreAllPlayers) return;
+
+    setAllPlayersVisibleCount((currentCount) =>
+      Math.min(currentCount + PLAYERS_PAGE_SIZE, filteredAllPlayers.length),
+    );
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center px-4 py-8 md:px-12 relative bg-pitch-950 text-white">
@@ -233,10 +276,15 @@ export default function PlayersPage() {
                                   {player.name}
                                 </p>
                                 <p className="mt-1 text-[11px] font-mono uppercase tracking-wide text-slate-400">
-                                  {[player.position1, player.position2]
+                                  {[
+                                    [player.position1, player.position2]
+                                      .filter(Boolean)
+                                      .join(" / "),
+                                    player.year,
+                                    `${player.basePrice} pts`,
+                                  ]
                                     .filter(Boolean)
-                                    .join(" / ")}{" "}
-                                  • {player.basePrice} pts
+                                    .join(" • ")}
                                 </p>
                               </li>
                             ))}
@@ -300,14 +348,14 @@ export default function PlayersPage() {
                 <input
                   type="text"
                   value={allPlayersQuery}
-                  onChange={(e) => setAllPlayersQuery(e.target.value)}
+                  onChange={handleAllPlayersQueryChange}
                   placeholder="Global search by name, position, or team..."
                   className="w-full h-11 pl-11 pr-10 rounded-xl bg-slate-950/60 border border-slate-700/60 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-[#ccff00]/50 focus:bg-slate-900/80 transition-all font-mono"
                 />
                 {allPlayersQuery && (
                   <button
                     type="button"
-                    onClick={() => setAllPlayersQuery("")}
+                    onClick={handleClearAllPlayersQuery}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
                     aria-label="Clear global search"
                   >
@@ -326,14 +374,30 @@ export default function PlayersPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3">
-                    {filteredAllPlayers.map((player) => (
-                      <PlayerRowItem
-                        key={player.id}
-                        player={player}
-                        status="ALL"
-                      />
-                    ))}
+                  <div
+                    className="max-h-[70vh] overflow-y-auto overscroll-contain pr-1"
+                    onScroll={handleAllPlayersScroll}
+                  >
+                    <div className="flex flex-col gap-3">
+                      {visibleAllPlayers.map((player) => (
+                        <PlayerRowItem
+                          key={player.id}
+                          player={player}
+                          status="ALL"
+                          onSelect={setSelectedAllPlayer}
+                        />
+                      ))}
+                    </div>
+
+                    {hasMoreAllPlayers ? (
+                      <p className="pt-4 pb-1 text-center text-[11px] font-mono uppercase tracking-widest text-slate-500">
+                        Scroll to load more
+                      </p>
+                    ) : (
+                      <p className="pt-4 pb-1 text-center text-[11px] font-mono uppercase tracking-widest text-slate-600">
+                        End of list
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -341,6 +405,16 @@ export default function PlayersPage() {
           </div>
         )}
       </div>
+
+      <PlayerDetailsDialog
+        player={selectedAllPlayer}
+        status="ALL"
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedAllPlayer(null);
+          }
+        }}
+      />
     </div>
   );
 }

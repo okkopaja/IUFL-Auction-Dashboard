@@ -68,7 +68,7 @@ export default function Home() {
               <span className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-black" />
 
               <span className="relative z-10 flex items-center gap-2">
-                Public Auction View
+                Auction View
                 <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>
@@ -83,7 +83,7 @@ export default function Home() {
               <span className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#ccff00]" />
 
               <span className="relative z-10 flex items-center gap-2">
-                Private Auction Dashboard
+                Auction Dashboard
                 <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>

@@ -8,7 +8,7 @@ import { ROUTES } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Admin Players — IUFL 2026 Auction",
   description:
-    "Dedicated player registry management for search, review, and profile inspection.",
+    "Dedicated player registry management for search, editing, and profile control.",
   robots: { index: false, follow: false },
 };
 
@@ -25,7 +25,7 @@ export default function AdminPlayersPage() {
               Players Registry Management
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Search players, inspect statuses, and open detailed profile views.
+              Search, edit, and update player profiles with image management.
             </p>
           </div>
         </div>

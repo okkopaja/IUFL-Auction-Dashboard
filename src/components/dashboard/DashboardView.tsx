@@ -44,14 +44,14 @@ export function DashboardView() {
     );
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col gap-4 md:gap-6 z-10 relative mt-4 md:mt-8 px-4 md:px-0">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-4 md:gap-6 z-10 relative mt-4 md:mt-8 px-4 md:px-8 lg:px-0">
       {/* Auth bar â€” top-right corner */}
-      <div className="absolute top-0 right-4 md:right-0 z-50">
+      <div className="absolute top-0 right-4 md:right-0 z-50 transform md:translate-y-0 translate-y-2">
         <AuthBar />
       </div>
 
       {/* Title */}
-      <h1 className="text-2xl md:text-5xl font-bold uppercase tracking-wide font-heading pr-12 md:pr-16 pt-2 md:pt-0">
+      <h1 className="text-2xl md:text-5xl font-bold uppercase tracking-wide font-heading pr-12 md:pr-16 pt-10 md:pt-0">
         IUFL 2026 Player <span className="text-accent-gold">Auction</span>
       </h1>
 

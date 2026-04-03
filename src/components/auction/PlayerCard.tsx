@@ -1,7 +1,15 @@
 import { User } from "lucide-react";
-import Image from "next/image";
 import { toDisplayImageUrl } from "@/lib/imageUrl";
+import { cn } from "@/lib/utils";
 import type { Player } from "@/types";
+
+const POSITION_COLORS: Record<string, string> = {
+  GK: "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+  DEF: "text-blue-400 bg-blue-400/10 border-blue-400/30",
+  MID: "text-green-400 bg-green-400/10 border-green-400/30",
+  ATT: "text-red-400 bg-red-400/10 border-red-400/30",
+  FWD: "text-red-400 bg-red-400/10 border-red-400/30",
+};
 
 export function PlayerCard({
   player,
@@ -13,76 +21,117 @@ export function PlayerCard({
   if (!player) return null;
   const playerImageUrl = toDisplayImageUrl(player.imageUrl);
 
+  const pos1 = player.position1;
+  const pos2 = player.position2;
+
+  const pos1Class =
+    POSITION_COLORS[pos1?.toUpperCase()] ??
+    "text-slate-400 bg-slate-400/10 border-slate-400/30";
+  const pos2Class = pos2
+    ? (POSITION_COLORS[pos2.toUpperCase()] ??
+      "text-slate-400 bg-slate-400/10 border-slate-400/30")
+    : null;
+
   return (
     <div
-      className={`w-full relative rounded-2xl overflow-hidden shadow-2xl bg-[#0f0f0f] border border-[#333] group transition-all duration-500 ease-out hover:shadow-[0_0_40px_rgba(255,215,0,0.15)] ${
+      className={cn(
+        "w-full relative overflow-hidden rounded-3xl border border-slate-700 bg-pitch-950 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col z-10 transition-all duration-500 ease-out hover:shadow-[0_0_40px_rgba(255,215,0,0.15)] group mx-auto",
         isFocusMode
-          ? "max-w-[500px] md:max-w-[600px] lg:max-w-[700px] h-auto max-h-[85vh] aspect-[4/5] md:aspect-[3/4]"
-          : "max-w-[300px] md:max-w-[360px] aspect-[3/4] md:aspect-[4/5]"
-      }`}
-    >
-      {/* Background Image / Placeholder */}
-      {playerImageUrl ? (
-        <Image
-          src={playerImageUrl}
-          alt={player.name}
-          fill
-          className={`opacity-90 group-hover:opacity-100 transition-all duration-700 pointer-events-none ${
-            isFocusMode
-              ? "object-contain object-center scale-100"
-              : "object-cover object-top group-hover:scale-105"
-          }`}
-          sizes="(max-width: 768px) 100vw, 400px"
-        />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center text-[#333] bg-[#0a0a0a] inset-0 absolute">
-          <User className="w-32 h-32 opacity-20" />
-        </div>
+          ? "max-w-md sm:max-w-lg md:max-w-xl h-auto max-h-[90vh]"
+          : "max-w-[300px] md:max-w-[360px] max-h-[480px]"
       )}
-
-      {/* Gradient Overlay for Text Visibility */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10" />
-
-      {/* Top Badges */}
+    >
       <div
-        className={`absolute left-4 z-20 flex flex-col items-start gap-2 ${isFocusMode ? "top-6 md:top-8" : "top-4"}`}
+        className={cn(
+          "w-full relative flex-1 flex items-center justify-center bg-slate-900/50 overflow-hidden",
+          isFocusMode ? "min-h-[40vh]" : "min-h-[250px] md:min-h-[300px]"
+        )}
       >
-        <span
-          className={`bg-black/60 backdrop-blur-md text-slate-200 border border-slate-700/50 rounded-md font-bold uppercase tracking-widest leading-none ${isFocusMode ? "px-4 py-2 text-base md:text-lg lg:text-xl" : "px-3 md:px-4 py-1.5 text-sm md:text-base"}`}
-        >
-          Stream: {player.stream ?? "Unspecified"}
-        </span>
-        {player.year && (
-          <span
-            className={`bg-black/60 backdrop-blur-md text-slate-400 border border-slate-700/50 rounded-md uppercase font-mono tracking-wider leading-none ${isFocusMode ? "px-3 py-1.5 text-sm md:text-base" : "px-2.5 md:px-3 py-1 text-xs md:text-sm"}`}
-          >
-            {player.year}
-          </span>
+        <div className="absolute inset-0 bg-gradient-to-t from-pitch-950 via-transparent to-transparent z-10 pointer-events-none group-hover:opacity-80 transition-opacity duration-500" />
+
+        {playerImageUrl ? (
+          <img
+            src={playerImageUrl}
+            alt={player.name}
+            className={cn(
+              "w-full h-full decoding-async group-hover:scale-105 transition-transform duration-700",
+              isFocusMode
+                ? "object-contain max-h-[60vh]"
+                : "object-contain max-h-[300px]"
+            )}
+            decoding="async"
+          />
+        ) : (
+          <div className="flex items-center justify-center text-slate-700 font-black h-full w-full">
+            <User
+              className={cn(
+                "opacity-20",
+                isFocusMode ? "w-32 h-32" : "w-16 h-16 md:w-20 md:h-20"
+              )}
+            />
+          </div>
         )}
       </div>
 
-      {/* Player Info (Bottom) */}
       <div
-        className={`absolute bottom-0 left-0 w-full z-20 flex flex-col ${isFocusMode ? "p-8 md:p-10" : "p-6"}`}
+        className={cn(
+          "w-full shrink-0 bg-pitch-950 flex flex-col items-center gap-2 text-center relative z-20 pb-6",
+          isFocusMode ? "p-6 pt-0" : "p-4 pt-0"
+        )}
       >
-        {/* Positions */}
-        <div className="flex gap-2 mb-2">
-          <span
-            className={`text-accent-gold font-mono tracking-widest uppercase font-semibold drop-shadow-md ${isFocusMode ? "text-base md:text-xl" : "text-sm"}`}
-          >
-            {player.position1}
-            {player.position2 && (
-              <span className="text-slate-400"> / {player.position2}</span>
-            )}
-          </span>
-        </div>
-
-        {/* Name */}
-        <h2
-          className={`leading-none font-black text-white tracking-widest uppercase mb-1 drop-shadow-lg ${isFocusMode ? "text-5xl md:text-6xl lg:text-[5rem]" : "text-3xl md:text-4xl"}`}
+        <p className="text-[10px] text-accent-gold uppercase tracking-[0.3em] font-black mb-1">
+          {isFocusMode ? "Current Player" : "Next In Line"}
+        </p>
+        <div className="h-px w-12 bg-accent-gold/30 mb-2 rounded-full" />
+        <h3
+          className={cn(
+            "font-black font-heading tracking-wider uppercase text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]",
+            isFocusMode
+              ? "text-4xl md:text-5xl lg:text-[4rem] leading-none mb-2"
+              : "text-2xl mb-1"
+          )}
         >
           {player.name || "Unnamed Player"}
-        </h2>
+        </h3>
+
+        <div className="flex flex-wrap justify-center gap-2 mt-2 w-full px-2">
+          <span
+            className={cn(
+              "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border shadow-sm",
+              pos1Class,
+              isFocusMode && "px-4 py-1.5 text-xs"
+            )}
+          >
+            {pos1}
+          </span>
+          {pos2 && (
+             <span
+             className={cn(
+               "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border shadow-sm",
+               pos2Class,
+               isFocusMode && "px-4 py-1.5 text-xs"
+             )}
+           >
+             {pos2}
+           </span>
+          )}
+          <span
+            className={cn(
+              "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border text-slate-300 bg-slate-800/30 border-slate-700/50 shadow-sm",
+              isFocusMode && "px-4 py-1.5 text-xs"
+            )}
+          >
+            {player.stream || "N/A"}
+          </span>
+          <span
+            className={cn(
+              "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded border text-slate-300 bg-slate-800/30 border-slate-700/50 shadow-sm",
+              isFocusMode && "px-4 py-1.5 text-xs"
+            )}
+          >
+            {player.year || "N/A"}
+          </span>
+        </div>
       </div>
 
       {/* Subtle shine effect */}

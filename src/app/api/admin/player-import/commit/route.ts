@@ -5,12 +5,18 @@ import {
   getImportCheckRecord,
 } from "@/features/player-import/checkStore";
 import { buildImportCheckFingerprint } from "@/features/player-import/fingerprint";
+import { loadIconNameSetForSession } from "@/features/player-import/iconLookup";
+import {
+  filterRowsByIconName,
+  isIconName,
+} from "@/features/player-import/iconNames";
 import {
   enqueueDriveImageIngestionRun,
   processImageIngestionRun,
 } from "@/features/player-import/imageIngestion";
 import { importWorkflowCommitPayloadSchema } from "@/features/player-import/schema";
 import type {
+  ImportCheckIssue,
   ImportCommitResult,
   ImportDbMatchSnapshot,
   ImportResolutionAction,
@@ -158,11 +164,54 @@ export async function POST(req: NextRequest) {
       }),
     );
 
+    const iconNameSet = await loadIconNameSetForSession(supabase, sessionId);
+
+    const existingIconPlayersInBase = filterRowsByIconName(
+      existingPlayers,
+      iconNameSet,
+    );
+    if (existingIconPlayersInBase.length > 0) {
+      const iconPlayersPreview = [
+        ...new Set(
+          existingIconPlayersInBase.map((player) => player.name.trim()),
+        ),
+      ].slice(0, 8);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "IUFL icons are present in the player base. Use Remove IUFL Icons from Playerbase before committing import.",
+          data: {
+            iconPlayersInBaseCount: existingIconPlayersInBase.length,
+            iconPlayersPreview,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const iconIssuesByRowKey = new Map<string, ImportCheckIssue[]>();
+    for (const row of rows) {
+      if (!isIconName(row.name, iconNameSet)) continue;
+
+      iconIssuesByRowKey.set(row.rowKey, [
+        {
+          code: "ICON_PLAYER",
+          severity: "blocking",
+          field: "name",
+          message:
+            "Matches an IUFL icon name. Icons cannot be imported into the player base.",
+        },
+      ]);
+    }
+
     const analysis = analyzeImportRows({
       mode,
       headers: checkRecord.headers,
       rows,
       existingPlayers,
+      extraIssuesByRowKey: iconIssuesByRowKey,
     });
 
     if (analysis.summary.missingHeaders.length > 0) {

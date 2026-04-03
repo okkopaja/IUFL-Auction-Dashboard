@@ -129,8 +129,8 @@ function PlayerListContent({
           <div>
             <div className="font-medium text-slate-200">{p.name}</div>
             <div className="text-xs text-slate-400">
-              {p.position1}
-              {p.position2 ? ` / ${p.position2}` : ""}
+              {[p.position1, p.position2].filter(Boolean).join(" / ")}
+              {p.year ? ` • ${p.year}` : ""}
             </div>
           </div>
           {status === "SOLD" ? (

@@ -91,13 +91,17 @@ export function PlayerImportPanel() {
     [draftRows, resolutions],
   );
 
+  const hasIconPlayersInPlayerbase =
+    (checkResult?.existingIconPlayersInBaseCount ?? 0) > 0;
+
   const canCommit =
     hasChanges &&
     !isSubmitting &&
     !isChecking &&
     !!checkResult &&
     unresolvedConflicts === 0 &&
-    !hasActiveErrors;
+    !hasActiveErrors &&
+    !hasIconPlayersInPlayerbase;
 
   const ingestionIsTerminal =
     imageIngestion?.status === "COMPLETED" ||
@@ -257,6 +261,10 @@ export function PlayerImportPanel() {
 
       if (nextCheck.summary.missingHeaders.length > 0) {
         toast.error("Required headers are missing. Fix CSV and re-upload.");
+      } else if (nextCheck.summary.iconRows > 0) {
+        toast.error(
+          `Check failed: ${nextCheck.summary.iconRows} row${nextCheck.summary.iconRows === 1 ? "" : "s"} match IUFL icon names. Remove those rows from CSV.`,
+        );
       } else if (nextCheck.summary.blockingRows > 0) {
         toast.warning(
           `Check complete with ${nextCheck.summary.blockingRows} blocking rows. Resolve them before committing.`,
@@ -291,6 +299,13 @@ export function PlayerImportPanel() {
 
     if (hasActiveErrors) {
       toast.error("Fix row errors or mark those rows as SKIP");
+      return;
+    }
+
+    if (hasIconPlayersInPlayerbase) {
+      toast.error(
+        "Remove IUFL Icons from Playerbase before committing player import",
+      );
       return;
     }
 
@@ -575,6 +590,21 @@ export function PlayerImportPanel() {
                 Check complete: {checkResult.summary.blockingRows} blocking,{" "}
                 {checkResult.summary.warningRows} warnings.
               </p>
+              {checkResult.summary.iconRows > 0 && (
+                <p className="mt-1 text-xs">
+                  {checkResult.summary.iconRows} row
+                  {checkResult.summary.iconRows === 1 ? "" : "s"} match IUFL
+                  icon names and must be removed from this import.
+                </p>
+              )}
+              {(checkResult.existingIconPlayersInBaseCount ?? 0) > 0 && (
+                <p className="mt-1 text-xs">
+                  Active playerbase still contains{" "}
+                  {checkResult.existingIconPlayersInBaseCount} IUFL icon player
+                  {checkResult.existingIconPlayersInBaseCount === 1 ? "" : "s"}.
+                  Use Remove IUFL Icons from Playerbase before commit.
+                </p>
+              )}
               {checkResult.summary.missingHeaders.length > 0 && (
                 <p className="mt-1 text-xs">
                   Missing headers:{" "}

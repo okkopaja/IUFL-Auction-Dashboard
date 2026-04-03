@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Shield,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -29,7 +30,6 @@ import {
 import { ROUTES } from "@/lib/constants";
 import { IconsImportPanel } from "./icons-import/IconsImportPanel";
 import { PlayerImportPanel } from "./player-import/PlayerImportPanel";
-import { AdminPlayersBlock } from "./players/AdminPlayersBlock";
 
 interface TransactionLog {
   id: string;
@@ -63,6 +63,7 @@ export function AdminDashboardView() {
   const [stats, setStats] = useState<AuctionStats | null>(null);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [isResettingSession, setIsResettingSession] = useState(false);
+  const [isRemovingIcons, setIsRemovingIcons] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetPassword, setResetPassword] = useState("");
   const [logsLoading, setLogsLoading] = useState(true);
@@ -157,6 +158,53 @@ export function AdminDashboardView() {
 
   const handleSignOut = () => {
     signOut({ redirectUrl: "/" });
+  };
+
+  const handleRemoveIconsFromPlayerbase = async () => {
+    const confirmed = confirm(
+      "This will remove UNSOLD players whose names match IUFL icon profiles (Captain/Marquee/Owner/Co-Owner). Continue?",
+    );
+    if (!confirmed) return;
+
+    setIsRemovingIcons(true);
+    try {
+      const res = await postJson("/api/admin/player-import/remove-icons");
+      if (!res.success) throw new Error(res.error);
+
+      const removedCount = Number(res.data?.removedCount ?? 0);
+      const blockedCount = Number(res.data?.blockedCount ?? 0);
+
+      if (removedCount === 0 && blockedCount === 0) {
+        toast.success("No IUFL icon names were found in the playerbase.");
+      } else if (blockedCount > 0) {
+        toast.warning(
+          `Removed ${removedCount} icon player(s). ${blockedCount} player(s) were not removed because they are not UNSOLD.`,
+        );
+      } else {
+        toast.success(
+          `Removed ${removedCount} IUFL icon player(s) from the playerbase.`,
+        );
+      }
+
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["players"] }),
+        qc.invalidateQueries({ queryKey: ["admin-players"] }),
+        qc.invalidateQueries({ queryKey: ["currentPlayer"] }),
+        qc.invalidateQueries({ queryKey: ["auction-current"] }),
+        qc.invalidateQueries({ queryKey: ["auctionLog"] }),
+        qc.invalidateQueries({ queryKey: ["auctionStats"] }),
+      ]);
+
+      await fetchData();
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to remove IUFL icons from playerbase",
+      );
+    } finally {
+      setIsRemovingIcons(false);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -319,6 +367,28 @@ export function AdminDashboardView() {
               />
               {isResettingSession ? "Resetting…" : "Reset Session"}
             </button>
+
+            <button
+              type="button"
+              id="admin-remove-icons-playerbase-btn"
+              onClick={handleRemoveIconsFromPlayerbase}
+              disabled={isRemovingIcons}
+              className="
+                flex items-center gap-2 px-5 py-2.5 rounded-xl
+                bg-amber-500/20 border border-amber-500/40 text-amber-200
+                hover:bg-amber-500/30 hover:border-amber-400
+                text-sm font-semibold tracking-wide
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-all duration-200
+              "
+            >
+              <Trash2
+                className={`size-4 ${isRemovingIcons ? "animate-spin" : ""}`}
+              />
+              {isRemovingIcons
+                ? "Removing Icons…"
+                : "Remove IUFL Icons from Playerbase"}
+            </button>
           </div>
         </div>
 
@@ -448,7 +518,22 @@ export function AdminDashboardView() {
               <Users className="size-5 text-accent-gold" />
               Players Registry
             </div>
-            <AdminPlayersBlock />
+
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Player editing now lives in a dedicated Players section with image
+              upload, name updates, and position management.
+            </p>
+
+            <Link href={ROUTES.ADMIN_PLAYERS} className="block w-full">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 border-slate-700 bg-slate-900/30 text-slate-200 hover:border-slate-500 hover:bg-slate-800/60 justify-between"
+              >
+                Open Players Section
+                <ChevronRight className="size-4 text-accent-gold" />
+              </Button>
+            </Link>
           </div>
         </div>
 

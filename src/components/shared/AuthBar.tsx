@@ -27,11 +27,11 @@ export function AuthBar() {
           href="/v1/public/sign-in"
           id="sign-in-btn"
           className="
-            group flex items-center gap-2 px-4 py-1.5 rounded-full
+            group flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 rounded-full
             border border-accent-gold/40 bg-accent-gold/10
             text-accent-gold hover:bg-accent-gold/20 hover:border-accent-gold/70
-            text-sm font-semibold tracking-wide
-            transition-all duration-200
+            text-xs md:text-sm font-semibold tracking-wide
+            transition-all duration-200 whitespace-nowrap
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-gold/60
           "
         >

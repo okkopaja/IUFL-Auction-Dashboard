@@ -55,7 +55,8 @@ const globals = globalThis as typeof globalThis & {
 };
 
 const runs =
-  globals.__iconsImageIngestionRuns ?? new Map<string, IconsImageIngestionRun>();
+  globals.__iconsImageIngestionRuns ??
+  new Map<string, IconsImageIngestionRun>();
 if (!globals.__iconsImageIngestionRuns) {
   globals.__iconsImageIngestionRuns = runs;
 }
@@ -76,7 +77,9 @@ function toPositiveInt(value: number | undefined, fallback: number): number {
   return Math.floor(value);
 }
 
-function deriveRunStatus(run: IconsImageIngestionRun): IconsImportImageRunStatus {
+function deriveRunStatus(
+  run: IconsImageIngestionRun,
+): IconsImportImageRunStatus {
   const totalJobs = run.jobs.length;
   if (totalJobs === 0) return "COMPLETED";
 
@@ -112,14 +115,17 @@ function buildFallbackName(teamName: string, role: TeamRole): string {
   return `${normalizedTeamName} ${toRoleLabel(role)}`;
 }
 
-function mapFailedRows(run: IconsImageIngestionRun): IconsImportImageIngestionFailureRow[] {
+function mapFailedRows(
+  run: IconsImageIngestionRun,
+): IconsImportImageIngestionFailureRow[] {
   return run.jobs
     .filter((job) => job.status === "FAILED")
     .sort((a, b) => a.rowNumber - b.rowNumber)
     .map((job) => ({
       rowKey: job.rowKey,
       rowNumber: job.rowNumber,
-      name: (job.name ?? "").trim() || buildFallbackName(job.teamName, job.role),
+      name:
+        (job.name ?? "").trim() || buildFallbackName(job.teamName, job.role),
       teamName: job.teamName,
       role: job.role,
       imageUrl: job.imageUrl,
@@ -127,7 +133,9 @@ function mapFailedRows(run: IconsImageIngestionRun): IconsImportImageIngestionFa
     }));
 }
 
-function toProgress(run: IconsImageIngestionRun): IconsImportImageIngestionProgress {
+function toProgress(
+  run: IconsImageIngestionRun,
+): IconsImportImageIngestionProgress {
   let pendingJobs = 0;
   let inProgressJobs = 0;
   let completedJobs = 0;
@@ -245,7 +253,8 @@ async function processJob(
     job.error = null;
   } catch (error) {
     job.status = "FAILED";
-    job.error = error instanceof Error ? error.message : "Unknown ingestion error";
+    job.error =
+      error instanceof Error ? error.message : "Unknown ingestion error";
   }
 }
 

@@ -160,7 +160,7 @@ export function AuctionLayout() {
           />
         </div>
         {player ? (
-          <div className="flex-1 flex flex-col md:flex-row h-full overflow-y-auto md:overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row h-full overflow-y-auto overflow-x-hidden md:overflow-hidden">
             {/* Player Preview */}
             <div
               className={`transition-all duration-500 ease-in-out ${

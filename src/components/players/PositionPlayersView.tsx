@@ -2,8 +2,11 @@
 
 import { ArrowLeft, Search, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { PlayerRowItem } from "@/components/dashboard/PlayerListView";
+import { type ChangeEvent, type UIEvent, useMemo, useState } from "react";
+import {
+  PlayerDetailsDialog,
+  PlayerRowItem,
+} from "@/components/dashboard/PlayerListView";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { usePlayers } from "@/hooks/useAuction";
 import { ROUTES } from "@/lib/constants";
@@ -22,8 +25,13 @@ export function PositionPlayersView({
   group,
   title,
 }: PositionPlayersViewProps) {
+  const PAGE_SIZE = 15;
   const { data: players = [], isLoading } = usePlayers();
   const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedPlayer, setSelectedPlayer] = useState<
+    (typeof players)[number] | null
+  >(null);
 
   const groupedPlayers = useMemo(
     () => filterPlayersByPositionGroup(players, group),
@@ -35,7 +43,38 @@ export function PositionPlayersView({
     [groupedPlayers, query],
   );
 
+  const visiblePlayers = useMemo(
+    () => filteredPlayers.slice(0, visibleCount),
+    [filteredPlayers, visibleCount],
+  );
+
+  const hasMorePlayers = visiblePlayers.length < filteredPlayers.length;
+
   const hasQuery = query.trim().length > 0;
+
+  const handleQueryChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setQuery(event.target.value);
+    setVisibleCount(PAGE_SIZE);
+    setSelectedPlayer(null);
+  };
+
+  const handleClearQuery = () => {
+    setQuery("");
+    setVisibleCount(PAGE_SIZE);
+    setSelectedPlayer(null);
+  };
+
+  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    const nearBottom =
+      target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+
+    if (!nearBottom || !hasMorePlayers) return;
+
+    setVisibleCount((currentCount) =>
+      Math.min(currentCount + PAGE_SIZE, filteredPlayers.length),
+    );
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center px-4 py-8 md:px-12 relative bg-pitch-950 text-white">
@@ -70,14 +109,14 @@ export function PositionPlayersView({
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleQueryChange}
             placeholder={`Search ${title.toLowerCase()} by name, position, or team...`}
             className="w-full h-11 pl-11 pr-10 rounded-xl bg-slate-950/60 border border-slate-700/60 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-[#ccff00]/50 focus:bg-slate-900/80 transition-all font-mono"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery("")}
+              onClick={handleClearQuery}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
               aria-label={`Clear ${title} search`}
             >
@@ -97,13 +136,43 @@ export function PositionPlayersView({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {filteredPlayers.map((player) => (
-              <PlayerRowItem key={player.id} player={player} status="ALL" />
-            ))}
+          <div
+            className="max-h-[70vh] overflow-y-auto overscroll-contain pr-1"
+            onScroll={handleListScroll}
+          >
+            <div className="flex flex-col gap-3">
+              {visiblePlayers.map((player) => (
+                <PlayerRowItem
+                  key={player.id}
+                  player={player}
+                  status="ALL"
+                  onSelect={setSelectedPlayer}
+                />
+              ))}
+            </div>
+
+            {hasMorePlayers ? (
+              <p className="pt-4 pb-1 text-center text-[11px] font-mono uppercase tracking-widest text-slate-500">
+                Scroll to load more
+              </p>
+            ) : (
+              <p className="pt-4 pb-1 text-center text-[11px] font-mono uppercase tracking-widest text-slate-600">
+                End of list
+              </p>
+            )}
           </div>
         )}
       </div>
+
+      <PlayerDetailsDialog
+        player={selectedPlayer}
+        status="ALL"
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedPlayer(null);
+          }
+        }}
+      />
     </div>
   );
 }

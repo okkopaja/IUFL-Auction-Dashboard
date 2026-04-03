@@ -51,7 +51,7 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
   const rosterCount = team.playersOwnedCount;
 
   return (
-    <div className="w-full max-w-5xl mx-auto flex flex-col gap-8 z-10 relative">
+    <div className="w-full max-w-5xl mx-auto flex flex-col gap-8 relative">
       <div>
         <Link href={ROUTES.TEAMS}>
           <Button
@@ -104,7 +104,7 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
         </div>
       </div>
 
-      <div className="bg-pitch-900 border border-slate-800 rounded-3xl p-6 md:p-8 z-10 shadow-2xl">
+      <div className="bg-pitch-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl">
         <h3 className="text-xl font-heading font-bold uppercase tracking-widest text-slate-200 flex items-center gap-3">
           <Users className="w-6 h-6 text-slate-500" />
           Team Members
@@ -122,7 +122,7 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
         </div>
       </div>
 
-      <div className="bg-pitch-900 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur z-10 shadow-2xl">
+      <div className="bg-pitch-900 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur shadow-2xl">
         <div className="p-6 md:px-8 border-b border-slate-800 flex items-center justify-between bg-black/20">
           <h3 className="text-xl font-heading font-bold uppercase tracking-widest text-slate-200 flex items-center gap-3">
             <Users className="w-6 h-6 text-slate-500" />
@@ -155,6 +155,9 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
                       {player.position1}
                       {player.position2 ? ` / ${player.position2}` : ""}
                     </span>
+                    <span className="px-2 py-1 bg-slate-900 text-slate-400 rounded text-[10px] font-bold border border-slate-700 uppercase tracking-wider">
+                      {player.year || "—"}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -167,6 +170,9 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
                   <TableRow className="border-slate-800 hover:bg-transparent">
                     <TableHead className="text-slate-500 uppercase tracking-widest text-xs font-bold pl-6 md:pl-8 py-5">
                       Player Name
+                    </TableHead>
+                    <TableHead className="text-slate-500 uppercase tracking-widest text-xs font-bold w-24">
+                      Year
                     </TableHead>
                     <TableHead className="text-slate-500 uppercase tracking-widest text-xs font-bold w-37.5">
                       Position
@@ -184,6 +190,9 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
                     >
                       <TableCell className="font-bold text-slate-200 pl-6 md:pl-8 text-base py-4">
                         {player.name}
+                      </TableCell>
+                      <TableCell className="text-slate-400 font-mono text-xs font-bold uppercase tracking-wider">
+                        {player.year || "—"}
                       </TableCell>
                       <TableCell>
                         <span className="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px] font-bold border border-slate-700 uppercase tracking-wider">
@@ -235,51 +244,64 @@ function RoleProfileCard({
 
   return (
     <>
-      <motion.div 
+      <motion.div
         layoutId={`${layoutIdBase}-card`}
         onClick={() => profileImageUrl && setIsOpen(true)}
-        className={`rounded-2xl border border-slate-800/80 bg-pitch-950/40 p-4 ${
+        className={`relative overflow-hidden rounded-2xl border border-slate-800/80 bg-pitch-950/40 p-5 shadow-lg group ${
           profileImageUrl
-            ? "cursor-pointer hover:bg-slate-800/50 hover:border-slate-700 transition-colors"
+            ? "cursor-pointer hover:bg-slate-800/40 hover:border-slate-700 hover:-translate-y-1 transition-all duration-300"
             : ""
         }`}
       >
-        <motion.p layoutId={`${layoutIdBase}-label`} className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">
+        <motion.p
+          layoutId={`${layoutIdBase}-label`}
+          className="text-[10px] text-slate-500 uppercase tracking-[0.25em] font-bold"
+        >
           {label}
         </motion.p>
 
         {hasContent ? (
-          <div className="mt-4 min-h-18 flex items-center gap-3">
+          <div className="mt-4 min-h-[4.5rem] flex items-center gap-4">
             {profileImageUrl ? (
-              <motion.img
-                layoutId={`${layoutIdBase}-image`}
-                src={profileImageUrl}
-                alt={profile?.name || label}
-                className="size-14 rounded-full object-cover border border-slate-700 bg-slate-800"
-              />
+              <div className="relative size-16 shrink-0">
+                <div className="absolute inset-0 bg-accent-gold/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                <motion.img
+                  layoutId={`${layoutIdBase}-image`}
+                  src={profileImageUrl}
+                  alt={profile?.name || label}
+                  className="relative size-16 rounded-full object-cover border-2 border-slate-700 bg-slate-800 z-10 shadow-xl"
+                />
+              </div>
             ) : (
-              <div className="size-14 rounded-full border border-slate-800 bg-pitch-950/70" />
+              <div className="size-16 shrink-0 rounded-full border-2 border-slate-800 bg-pitch-950/70" />
             )}
 
-            <div className="min-h-5 flex items-center">
+            <div className="flex-1 min-h-[1.5rem] flex items-center">
               {profile?.name ? (
-                <motion.p layoutId={`${layoutIdBase}-name`} className="text-sm font-semibold text-slate-200 tracking-wide">
+                <motion.p
+                  layoutId={`${layoutIdBase}-name`}
+                  className="text-[15px] font-bold text-slate-100 tracking-wide line-clamp-2"
+                >
                   {profile.name}
                 </motion.p>
               ) : (
-                <span className="h-5" />
+                <span className="block h-5 w-1/2 bg-slate-800/50 rounded animate-pulse" />
               )}
             </div>
           </div>
         ) : (
-          <div className="mt-4 min-h-18 rounded-xl border border-dashed border-slate-800/80 bg-pitch-950/50" />
+          <div className="mt-4 min-h-[4.5rem] rounded-xl border border-dashed border-slate-800 bg-pitch-950/30 flex items-center justify-center">
+            <span className="text-xs uppercase tracking-widest text-slate-600 font-bold">
+              Unassigned
+            </span>
+          </div>
         )}
       </motion.div>
 
       <AnimatePresence>
         {isOpen && profileImageUrl && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            <motion.div 
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -290,14 +312,15 @@ function RoleProfileCard({
               layoutId={`${layoutIdBase}-card`}
               className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-slate-700 bg-pitch-950 shadow-2xl flex flex-col z-10"
             >
-              <button 
-                onClick={() => setIsOpen(false)} 
+              <button
+                onClick={() => setIsOpen(false)}
                 className="absolute top-4 right-4 z-20 rounded-full bg-black/40 p-2 text-white/70 hover:bg-black/80 hover:text-white transition-all backdrop-blur-md"
               >
                 <X className="h-5 w-5" />
               </button>
-              
-              <div className="w-full relative aspect-square sm:aspect-[4/5] flex items-center justify-center bg-slate-900 border-b border-slate-800">
+
+              <div className="w-full relative aspect-square sm:aspect-[4/5] flex items-center justify-center bg-slate-900/50">
+                <div className="absolute inset-0 bg-gradient-to-t from-pitch-950 via-transparent to-transparent z-10 pointer-events-none" />
                 <motion.img
                   layoutId={`${layoutIdBase}-image`}
                   src={profileImageUrl}
@@ -305,12 +328,19 @@ function RoleProfileCard({
                   className="h-full w-full object-cover"
                 />
               </div>
-              
-              <div className="w-full p-6 bg-gradient-to-t from-pitch-900 to-pitch-950 flex flex-col items-center gap-1.5 text-center">
-                <motion.p layoutId={`${layoutIdBase}-label`} className="text-xs text-accent-gold uppercase tracking-[0.2em] font-bold mb-1">
+
+              <div className="w-full p-8 pt-0 bg-pitch-950 flex flex-col items-center gap-2 text-center relative z-20">
+                <motion.p
+                  layoutId={`${layoutIdBase}-label`}
+                  className="text-[10px] text-accent-gold uppercase tracking-[0.3em] font-black mb-1"
+                >
                   {label}
                 </motion.p>
-                <motion.p layoutId={`${layoutIdBase}-name`} className="text-2xl font-black font-heading tracking-wider uppercase text-white shadow-sm">
+                <div className="h-px w-12 bg-accent-gold/30 mb-2 rounded-full" />
+                <motion.p
+                  layoutId={`${layoutIdBase}-name`}
+                  className="text-2xl md:text-3xl font-black font-heading tracking-wider uppercase text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]"
+                >
                   {profile?.name}
                 </motion.p>
               </div>

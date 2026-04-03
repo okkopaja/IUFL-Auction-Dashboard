@@ -2,8 +2,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { analyzeImportRows } from "@/features/player-import/analysis";
 import { saveImportCheckRecord } from "@/features/player-import/checkStore";
 import { buildImportCheckFingerprint } from "@/features/player-import/fingerprint";
+import { loadIconNameSetForSession } from "@/features/player-import/iconLookup";
+import { isIconName } from "@/features/player-import/iconNames";
 import { importCheckPayloadSchema } from "@/features/player-import/schema";
 import type {
+  ImportCheckIssue,
   ImportCheckResult,
   ImportDbMatchSnapshot,
 } from "@/features/player-import/types";
@@ -67,11 +70,33 @@ export async function POST(req: NextRequest) {
       }),
     );
 
+    const iconNameSet = await loadIconNameSetForSession(supabase, sessionId);
+    const iconIssuesByRowKey = new Map<string, ImportCheckIssue[]>();
+
+    for (const row of rows) {
+      if (!isIconName(row.name, iconNameSet)) continue;
+
+      iconIssuesByRowKey.set(row.rowKey, [
+        {
+          code: "ICON_PLAYER",
+          severity: "blocking",
+          field: "name",
+          message:
+            "Matches an IUFL icon name. Icons cannot be imported into the player base.",
+        },
+      ]);
+    }
+
+    const existingIconPlayersInBaseCount = existingPlayers.filter((player) =>
+      isIconName(player.name, iconNameSet),
+    ).length;
+
     const analysis = analyzeImportRows({
       mode,
       headers,
       rows,
       existingPlayers,
+      extraIssuesByRowKey: iconIssuesByRowKey,
     });
 
     const checkId = crypto.randomUUID();
@@ -91,6 +116,7 @@ export async function POST(req: NextRequest) {
       rows: analysis.rows,
       summary: analysis.summary,
       hasBlockingIssues: analysis.hasBlockingIssues,
+      existingIconPlayersInBaseCount,
     };
 
     saveImportCheckRecord({
