@@ -33,61 +33,57 @@ export default function Home() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-12 flex flex-col items-center justify-center gap-8"
+          className="mt-12 flex w-full max-w-3xl flex-col items-center justify-center gap-6"
           suppressHydrationWarning
         >
-          {/* Secondary Links Row */}
-          <div className="flex flex-row items-center justify-center gap-6 sm:gap-12">
+          <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
             <Link
               href={ROUTES.PLAYERS}
-              className="group relative px-6 py-3 font-sans text-xl sm:text-2xl uppercase tracking-widest text-slate-300 hover:text-white transition-colors"
+              className="group relative inline-flex min-h-14 items-center justify-between overflow-hidden rounded-none border border-[#ccff00]/45 bg-[#0d1218]/85 px-7 py-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[#ccff00] hover:bg-[#111821] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]/70"
               suppressHydrationWarning
             >
-              Players
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#ccff00] transition-all group-hover:w-full" />
+              <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(204,255,0,0.15),transparent_55%)] opacity-75 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="absolute top-0 left-0 h-2 w-2 border-l-2 border-t-2 border-[#ccff00]" />
+              <span className="absolute bottom-0 right-0 h-2 w-2 border-b-2 border-r-2 border-[#ccff00]" />
+
+              <span className="relative z-10 flex flex-col items-start">
+                <span className="text-[0.65rem] uppercase tracking-[0.35em] text-[#ccff00]/75">
+                  Explore
+                </span>
+                <span className="mt-1 text-lg font-semibold uppercase tracking-[0.2em] text-white sm:text-xl">
+                  Players
+                </span>
+              </span>
+
+              <ChevronRight className="relative z-10 h-5 w-5 text-[#ccff00] transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
 
             <Link
               href={ROUTES.TEAMS}
-              className="group relative px-6 py-3 font-sans text-xl sm:text-2xl uppercase tracking-widest text-slate-300 hover:text-white transition-colors"
+              className="group relative inline-flex min-h-14 items-center justify-between overflow-hidden rounded-none border border-[#ccff00]/45 bg-[#0d1218]/85 px-7 py-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[#ccff00] hover:bg-[#111821] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]/70"
               suppressHydrationWarning
             >
-              Teams
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#ccff00] transition-all group-hover:w-full" />
+              <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(204,255,0,0.15),transparent_55%)] opacity-75 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="absolute top-0 left-0 h-2 w-2 border-l-2 border-t-2 border-[#ccff00]" />
+              <span className="absolute bottom-0 right-0 h-2 w-2 border-b-2 border-r-2 border-[#ccff00]" />
+
+              <span className="relative z-10 flex flex-col items-start">
+                <span className="text-[0.65rem] uppercase tracking-[0.35em] text-[#ccff00]/75">
+                  Explore
+                </span>
+                <span className="mt-1 text-lg font-semibold uppercase tracking-[0.2em] text-white sm:text-xl">
+                  Teams
+                </span>
+              </span>
+
+              <ChevronRight className="relative z-10 h-5 w-5 text-[#ccff00] transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-            <Link
-              href={ROUTES.PUBLIC_AUCTION}
-              className="group relative inline-flex items-center justify-center gap-3 rounded-none bg-[#ccff00] px-10 py-5 text-sm font-bold uppercase tracking-widest text-black transition-all hover:bg-[#e0ff33] active:scale-95 overflow-hidden ring-1 ring-white/10"
-              suppressHydrationWarning
-            >
-              {/* Structural corner accents */}
-              <span className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-black" />
-              <span className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-black" />
-
-              <span className="relative z-10 flex items-center gap-2">
-                Auction View
-                <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </span>
-            </Link>
-
-            <Link
-              href={ROUTES.AUCTION}
-              className="group relative inline-flex items-center justify-center gap-3 rounded-none border border-[#ccff00]/40 bg-transparent px-10 py-5 text-sm font-bold uppercase tracking-widest text-[#ccff00] transition-all hover:bg-[#ccff00]/10 active:scale-95 overflow-hidden ring-1 ring-white/10"
-              suppressHydrationWarning
-            >
-              {/* Structural corner accents */}
-              <span className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#ccff00]" />
-              <span className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#ccff00]" />
-
-              <span className="relative z-10 flex items-center gap-2">
-                Auction Dashboard
-                <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </span>
-            </Link>
-          </div>
+          {/*
+            Direct landing-page navigation to auction views is disabled for now.
+            The dashboard is accessed via direct URL links only.
+          */}
         </motion.div>
       </div>
 
