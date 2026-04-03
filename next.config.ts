@@ -10,6 +10,12 @@ const supabaseHostname = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  typescript: {
+    tsconfigPath:
+      process.env.NODE_ENV === "production"
+        ? "tsconfig.build.json"
+        : "tsconfig.json",
+  },
   allowedDevOrigins: ["localtesting.fastcrew.in"],
   images: {
     remotePatterns: [
