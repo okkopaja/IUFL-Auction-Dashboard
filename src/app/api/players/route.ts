@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
     const status = req.nextUrl.searchParams.get("status");
     const supabase = await getSupabaseServerClient();
 
-    let query = supabase.from("Player").select("*");
+    let query = supabase
+      .from("Player")
+      .select("*,team:Team(id,name,shortCode)");
 
     if (status) {
       query = query.eq("status", status as "UNSOLD" | "SOLD" | "IN_AUCTION");

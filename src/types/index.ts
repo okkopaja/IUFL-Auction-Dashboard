@@ -1,6 +1,26 @@
 export type PlayerStatus = "UNSOLD" | "IN_AUCTION" | "SOLD";
 export type TeamRole = "OWNER" | "CO_OWNER" | "CAPTAIN" | "MARQUEE";
 export type AuctionActionType = "PASS" | "SELL";
+export type AuctionEndReason = "UNSOLD_DEPLETED" | "ITERATION_LIMIT_REACHED";
+
+export interface AuctionProgressionMeta {
+  nextPlayer: Player | null;
+  didWrap: boolean;
+  restartedFromAnchor: boolean;
+  restartAckRequired: boolean;
+  auctionEnded: boolean;
+  endReason: AuctionEndReason | null;
+  currentRound: number;
+}
+
+export interface CurrentPlayerState {
+  player: Player | null;
+  isComplete: boolean;
+  restartAckRequired: boolean;
+  unsoldIterationRound: number;
+  isAuctionEnded: boolean;
+  auctionEndReason: AuctionEndReason | null;
+}
 
 export interface TeamRoleProfile {
   id: string;
@@ -89,6 +109,12 @@ export interface AuctionSession {
   id: string;
   name: string;
   isActive: boolean;
+  unsoldIterationRound?: number;
+  unsoldIterationAnchorPlayerId?: string | null;
+  restartAckRequired?: boolean;
+  isAuctionEnded?: boolean;
+  auctionEndReason?: AuctionEndReason | null;
+  endedAt?: string | null;
 }
 
 export interface AuctionStats {

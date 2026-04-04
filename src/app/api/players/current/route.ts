@@ -16,7 +16,9 @@ export async function GET() {
 
     const { data: session, error: sessionError } = await supabase
       .from("AuctionSession")
-      .select("id")
+      .select(
+        "id,restartAckRequired,unsoldIterationRound,isAuctionEnded,auctionEndReason",
+      )
       .eq("isActive", true)
       .limit(1)
       .maybeSingle();
@@ -41,6 +43,36 @@ export async function GET() {
 
     if (error) throw error;
 
+    let activeOrPreviewPlayer = current;
+
+    if (!activeOrPreviewPlayer && !session.isAuctionEnded) {
+      const { data: latestSellHistory, error: latestSellHistoryError } =
+        await supabase
+          .from("AuctionActionHistory")
+          .select("fromPlayerId")
+          .eq("sessionId", session.id)
+          .eq("actionType", "SELL")
+          .order("createdAt", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (latestSellHistoryError) throw latestSellHistoryError;
+
+      if (latestSellHistory?.fromPlayerId) {
+        const { data: latestSoldPlayer, error: latestSoldPlayerError } =
+          await supabase
+            .from("Player")
+            .select("*")
+            .eq("sessionId", session.id)
+            .eq("id", latestSellHistory.fromPlayerId)
+            .maybeSingle();
+
+        if (latestSoldPlayerError) throw latestSoldPlayerError;
+
+        activeOrPreviewPlayer = latestSoldPlayer;
+      }
+    }
+
     const { count: unsoldCount, error: unsoldError } = await supabase
       .from("Player")
       .select("id", { count: "exact", head: true })
@@ -53,15 +85,15 @@ export async function GET() {
       .from("Transaction")
       .select("playerId,amount,createdAt")
       .eq("sessionId", session.id)
-      .eq("playerId", current?.id ?? "");
+      .eq("playerId", activeOrPreviewPlayer?.id ?? "");
 
     if (txError) throw txError;
 
-    const [enrichedCurrent] = current
+    const [enrichedCurrent] = activeOrPreviewPlayer
       ? withTransactionAmounts(
           [
             {
-              ...current,
+              ...activeOrPreviewPlayer,
               basePrice: PLAYER_BASE_PRICE,
             },
           ],
@@ -69,11 +101,19 @@ export async function GET() {
         )
       : [null];
 
+    const isSessionEnded = Boolean(session.isAuctionEnded);
+    const isComplete =
+      isSessionEnded || (!enrichedCurrent && (unsoldCount ?? 0) === 0);
+
     return NextResponse.json({
       success: true,
       data: enrichedCurrent,
       meta: {
-        isComplete: !enrichedCurrent && (unsoldCount ?? 0) === 0,
+        isComplete,
+        restartAckRequired: Boolean(session.restartAckRequired),
+        unsoldIterationRound: session.unsoldIterationRound ?? 1,
+        isAuctionEnded: isSessionEnded,
+        auctionEndReason: session.auctionEndReason ?? null,
       },
     });
   } catch (error) {

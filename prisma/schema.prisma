@@ -11,6 +11,12 @@ model AuctionSession {
   name         String
   isActive     Boolean       @default(true)
   totalPoints  Int           @default(1000)
+  unsoldIterationRound Int   @default(1)
+  unsoldIterationAnchorPlayerId String?
+  restartAckRequired Boolean @default(false)
+  isAuctionEnded Boolean     @default(false)
+  auctionEndReason AuctionEndReason?
+  endedAt      DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   teams        Team[]
@@ -96,6 +102,11 @@ enum ImportImageJobStatus {
 enum AuctionActionType {
   PASS
   SELL
+}
+
+enum AuctionEndReason {
+  UNSOLD_DEPLETED
+  ITERATION_LIMIT_REACHED
 }
 
 model AuctionActionHistory {

@@ -16,27 +16,51 @@ export type Database = {
     Tables: {
       AuctionSession: {
         Row: {
+          auctionEndReason:
+            | Database["public"]["Enums"]["AuctionEndReason"]
+            | null;
           createdAt: string;
+          endedAt: string | null;
           id: string;
           isActive: boolean;
+          isAuctionEnded: boolean;
           name: string;
+          restartAckRequired: boolean;
           totalPoints: number;
+          unsoldIterationAnchorPlayerId: string | null;
+          unsoldIterationRound: number;
           updatedAt: string;
         };
         Insert: {
+          auctionEndReason?:
+            | Database["public"]["Enums"]["AuctionEndReason"]
+            | null;
           createdAt?: string;
+          endedAt?: string | null;
           id: string;
           isActive?: boolean;
+          isAuctionEnded?: boolean;
           name: string;
+          restartAckRequired?: boolean;
           totalPoints?: number;
+          unsoldIterationAnchorPlayerId?: string | null;
+          unsoldIterationRound?: number;
           updatedAt: string;
         };
         Update: {
+          auctionEndReason?:
+            | Database["public"]["Enums"]["AuctionEndReason"]
+            | null;
           createdAt?: string;
+          endedAt?: string | null;
           id?: string;
           isActive?: boolean;
+          isAuctionEnded?: boolean;
           name?: string;
+          restartAckRequired?: boolean;
           totalPoints?: number;
+          unsoldIterationAnchorPlayerId?: string | null;
+          unsoldIterationRound?: number;
           updatedAt?: string;
         };
         Relationships: [];
@@ -441,6 +465,7 @@ export type Database = {
     };
     Enums: {
       AuctionActionType: "PASS" | "SELL";
+      AuctionEndReason: "UNSOLD_DEPLETED" | "ITERATION_LIMIT_REACHED";
       ImportImageJobStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
       ImportImageRunStatus:
         | "PENDING"
@@ -579,6 +604,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      AuctionEndReason: ["UNSOLD_DEPLETED", "ITERATION_LIMIT_REACHED"],
       PlayerStatus: ["UNSOLD", "SOLD", "IN_AUCTION"],
       TeamRole: ["OWNER", "CO_OWNER", "CAPTAIN", "MARQUEE"],
     },

@@ -88,7 +88,10 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
           </h2>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-            <StatBox label="Total Budget" value={team.pointsTotal} />
+            <StatBox
+              label="Total Points for Player Auction"
+              value={team.pointsTotal}
+            />
             <StatBox
               label="Spent"
               value={team.pointsSpent}

@@ -15,7 +15,7 @@ export async function POST() {
 
     const { data: session, error: sessionError } = await supabase
       .from("AuctionSession")
-      .select("id")
+      .select("id,restartAckRequired,isAuctionEnded,auctionEndReason")
       .eq("isActive", true)
       .limit(1)
       .maybeSingle();
@@ -25,6 +25,28 @@ export async function POST() {
       return NextResponse.json(
         { success: false, error: "No active auction session found" },
         { status: 404 },
+      );
+    }
+
+    if (session.restartAckRequired) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Restart acknowledgment required before continuing auction",
+          code: "RESTART_ACK_REQUIRED",
+        },
+        { status: 409 },
+      );
+    }
+
+    if (session.isAuctionEnded) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Auction session has already ended",
+          code: session.auctionEndReason ?? "AUCTION_ENDED",
+        },
+        { status: 409 },
       );
     }
 
@@ -40,7 +62,25 @@ export async function POST() {
 
     if (currentPlayerError) throw currentPlayerError;
 
-    const nextUnsold = await advanceToNextPlayer(supabase, session.id);
+    let referencePlayerId = currentInAuction?.id ?? null;
+
+    if (!referencePlayerId) {
+      const { data: latestAction, error: latestActionError } = await supabase
+        .from("AuctionActionHistory")
+        .select("fromPlayerId")
+        .eq("sessionId", session.id)
+        .order("createdAt", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestActionError) throw latestActionError;
+
+      referencePlayerId = latestAction?.fromPlayerId ?? null;
+    }
+
+    const progression = await advanceToNextPlayer(supabase, session.id, {
+      referencePlayerId,
+    });
 
     if (currentInAuction) {
       const { error: historyError } = await supabase
@@ -49,7 +89,7 @@ export async function POST() {
           id: crypto.randomUUID(),
           sessionId: session.id,
           fromPlayerId: currentInAuction.id,
-          toPlayerId: nextUnsold?.id ?? null,
+          toPlayerId: progression.nextPlayer?.id ?? null,
           actionType: "PASS",
           transactionId: null,
         });
@@ -59,7 +99,10 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      data: { nextPlayer: nextUnsold },
+      data: {
+        nextPlayer: progression.nextPlayer,
+        progression,
+      },
     });
   } catch (error) {
     logger.error("Failed to advance next player", error);

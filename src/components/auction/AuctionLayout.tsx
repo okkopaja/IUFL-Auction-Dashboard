@@ -1,16 +1,30 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { Menu, Maximize2, Minimize2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Maximize2, Menu, Minimize2 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
+  useAcknowledgeAuctionRestart,
   useAuctionLog,
   useCurrentPlayer,
   useNextPlayer,
+  usePlayers,
   useTeams,
 } from "@/hooks/useAuction";
+import { ROUTES } from "@/lib/constants";
 import { ErrorState } from "../shared/ErrorState";
 import { LoadingState } from "../shared/LoadingState";
+import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import {
   Sheet,
   SheetContent,
@@ -35,6 +49,7 @@ function formatCategoryLabel(position: string | null | undefined) {
 
 export function AuctionLayout() {
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [browsePlayerId, setBrowsePlayerId] = useState<string | null>(null);
   const {
     data: teams,
     isLoading: teamsLoading,
@@ -47,29 +62,67 @@ export function AuctionLayout() {
     error: playerError,
     refetch: rPlayer,
   } = useCurrentPlayer();
+  const {
+    data: allPlayers,
+    isLoading: playersLoading,
+    error: playersError,
+    refetch: rPlayers,
+  } = usePlayers();
   const { data: logs } = useAuctionLog();
   const nextPlayerMutation = useNextPlayer();
+  const acknowledgeRestartMutation = useAcknowledgeAuctionRestart();
   const {
     mutate: loadNextPlayer,
     isPending: isLoadingNextPlayer,
     isError: hasNextPlayerError,
   } = nextPlayerMutation;
 
-  const player = current?.player ?? null;
-  const currentCategoryLabel = formatCategoryLabel(player?.position1);
+  const livePlayer = current?.player ?? null;
+  const restartAckRequired = current?.restartAckRequired ?? false;
+  const isAuctionEnded = current?.isAuctionEnded ?? false;
+  const auctionEndReason = current?.auctionEndReason ?? null;
   const isComplete = current?.isComplete ?? false;
 
-  const loading = teamsLoading || playerLoading;
-  const error = teamsError || playerError;
+  const orderedPlayers = allPlayers ?? [];
+  const browsePlayer = useMemo(() => {
+    if (!browsePlayerId) return null;
+    return (
+      orderedPlayers.find((player) => player.id === browsePlayerId) ?? null
+    );
+  }, [browsePlayerId, orderedPlayers]);
+
+  const player = browsePlayer ?? livePlayer;
+  const currentCategoryLabel = formatCategoryLabel(player?.position1);
+  const loading = teamsLoading || playerLoading || playersLoading;
+  const error = teamsError || playerError || playersError;
+  const hasEnded = isAuctionEnded || isComplete;
+
+  useEffect(() => {
+    if (!browsePlayerId) return;
+
+    const stillExists = orderedPlayers.some(
+      (candidate) => candidate.id === browsePlayerId,
+    );
+    if (!stillExists) {
+      setBrowsePlayerId(null);
+    }
+  }, [browsePlayerId, orderedPlayers]);
+
+  useEffect(() => {
+    if (hasEnded && browsePlayerId) {
+      setBrowsePlayerId(null);
+    }
+  }, [browsePlayerId, hasEnded]);
 
   useEffect(() => {
     if (
       loading ||
       error ||
       player ||
-      isComplete ||
+      hasEnded ||
       isLoadingNextPlayer ||
-      hasNextPlayerError
+      hasNextPlayerError ||
+      restartAckRequired
     ) {
       return;
     }
@@ -78,12 +131,24 @@ export function AuctionLayout() {
   }, [
     error,
     hasNextPlayerError,
-    isComplete,
+    hasEnded,
     isLoadingNextPlayer,
     loadNextPlayer,
     loading,
     player,
+    restartAckRequired,
   ]);
+
+  const handleRestartAcknowledge = () => {
+    acknowledgeRestartMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Auction iteration restart acknowledged.");
+      },
+      onError: () => {
+        toast.error("Could not acknowledge restart. Please try again.");
+      },
+    });
+  };
 
   if (loading) return <LoadingState />;
   if (error)
@@ -93,16 +158,17 @@ export function AuctionLayout() {
         reset={() => {
           rTeams();
           rPlayer();
+          rPlayers();
         }}
       />
     );
   if (!teams) return null;
 
   return (
-    <div className="flex w-full h-[100dvh] bg-[#0a0a0a] text-slate-200 antialiased overflow-hidden">
+    <div className="flex w-full h-dvh bg-[#0a0a0a] text-slate-200 antialiased overflow-hidden">
       {/* Left Sidebar: Team List */}
       {!isFocusMode && (
-        <div className="hidden md:flex w-[320px] flex-shrink-0 flex-col h-full min-h-0 bg-[#111111] border-r border-[#222]">
+        <div className="hidden md:flex w-[320px] shrink-0 flex-col h-full min-h-0 bg-[#111111] border-r border-[#222]">
           <div className="p-6 border-b border-[#222]">
             <h2 className="text-sm font-semibold text-slate-400 tracking-wider uppercase">
               Franchise Standings
@@ -169,7 +235,7 @@ export function AuctionLayout() {
                   : "w-full md:w-1/2 lg:w-[45%]"
               } md:h-full flex flex-col items-center justify-center gap-6 p-4 md:p-6 lg:p-12 relative border-b md:border-b-0 md:border-r border-[#222] min-h-[40vh] md:min-h-0`}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#111]/80 to-transparent z-0 pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-br from-[#111]/80 to-transparent z-0 pointer-events-none" />
               <div
                 className={`relative z-10 text-center transition-all duration-500 ${isFocusMode ? "scale-125 mb-4" : ""}`}
               >
@@ -183,6 +249,7 @@ export function AuctionLayout() {
               <PlayerCard player={player} isFocusMode={isFocusMode} />
 
               <button
+                type="button"
                 onClick={() => setIsFocusMode(!isFocusMode)}
                 className="mt-2 z-10 flex items-center justify-center gap-2 px-6 py-2.5 rounded-full border border-[#333] bg-[#111]/80 backdrop-blur-sm text-slate-300 font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-[#222] hover:text-white hover:border-accent-gold/50 transition-all duration-300"
               >
@@ -199,18 +266,38 @@ export function AuctionLayout() {
             </div>
 
             {/* Bidding Controls Area */}
-            <div className="w-full md:flex-1 md:h-full flex flex-col items-center justify-start md:justify-center p-4 md:p-6 lg:p-12 bg-gradient-to-b from-[#0a0a0a] to-[#0f0f0f] pb-10 md:pb-safe">
-              <BidControls player={player} teams={teams} logs={logs || []} />
+            <div className="w-full md:flex-1 md:h-full flex flex-col items-center justify-start md:justify-center p-4 md:p-6 lg:p-12 bg-linear-to-b from-[#0a0a0a] to-[#0f0f0f] pb-10 md:pb-safe">
+              <BidControls
+                player={player}
+                livePlayer={livePlayer}
+                allPlayers={orderedPlayers}
+                teams={teams}
+                logs={logs || []}
+                controlsLocked={
+                  restartAckRequired || acknowledgeRestartMutation.isPending
+                }
+                onBrowsePlayerChange={setBrowsePlayerId}
+              />
             </div>
           </div>
-        ) : isComplete ? (
+        ) : hasEnded ? (
           <div className="w-full h-full flex flex-col items-center justify-center bg-black">
             <h2 className="text-3xl font-light tracking-widest text-[#555] mb-2 uppercase">
-              Auction Complete
+              Auction Ended
             </h2>
-            <p className="text-[#444] text-sm">
-              All players have been processed.
+            <p className="text-[#444] text-sm text-center max-w-md px-6">
+              {auctionEndReason === "UNSOLD_DEPLETED"
+                ? "Auction is ended. No unsold players remain."
+                : "Auction is ended, Iterated through unsold players twice."}
             </p>
+            <Link href={ROUTES.PLAYERS} className="mt-6">
+              <Button
+                type="button"
+                className="h-10 px-6 rounded-lg bg-accent-gold text-black hover:bg-accent-gold/90 font-semibold uppercase tracking-wider"
+              >
+                Navigate to All Players
+              </Button>
+            </Link>
           </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-black">
@@ -236,6 +323,34 @@ export function AuctionLayout() {
             ) : null}
           </div>
         )}
+
+        <Dialog open={restartAckRequired}>
+          <DialogContent
+            showCloseButton={false}
+            className="max-w-md border border-[#333] bg-[#111] text-slate-100"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold uppercase tracking-wide text-accent-gold">
+                Auction Iteration Restart
+              </DialogTitle>
+              <DialogDescription className="text-slate-300 leading-relaxed whitespace-pre-line">
+                {
+                  "Iterated through all unsold players once.\nRestarting from the first unsold player again"
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="border-[#222] bg-[#0f0f0f]">
+              <Button
+                type="button"
+                className="bg-accent-gold text-black hover:bg-accent-gold/90 font-semibold uppercase tracking-wider"
+                onClick={handleRestartAcknowledge}
+                disabled={acknowledgeRestartMutation.isPending}
+              >
+                {acknowledgeRestartMutation.isPending ? "Saving..." : "OK"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

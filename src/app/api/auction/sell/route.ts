@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { advanceToNextPlayer } from "@/lib/auctionProgression";
 import { requireAuctionAccess } from "@/lib/auth";
 import {
   calculateTeamBidConstraints,
@@ -38,7 +37,9 @@ export async function POST(req: NextRequest) {
 
     const { data: session, error: sessionError } = await supabase
       .from("AuctionSession")
-      .select("id")
+      .select(
+        "id,restartAckRequired,unsoldIterationRound,isAuctionEnded,auctionEndReason",
+      )
       .eq("isActive", true)
       .limit(1)
       .maybeSingle();
@@ -48,6 +49,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: "No active auction session found" },
         { status: 404 },
+      );
+    }
+
+    if (session.restartAckRequired) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Restart acknowledgment required before continuing auction",
+          code: "RESTART_ACK_REQUIRED",
+        },
+        { status: 409 },
+      );
+    }
+
+    if (session.isAuctionEnded) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Auction session has already ended",
+          code: session.auctionEndReason ?? "AUCTION_ENDED",
+        },
+        { status: 409 },
       );
     }
 
@@ -159,7 +182,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const nextPlayer = await advanceToNextPlayer(supabase, session.id);
+    const { count: unsoldCount, error: unsoldCountError } = await supabase
+      .from("Player")
+      .select("id", { count: "exact", head: true })
+      .eq("sessionId", session.id)
+      .eq("status", "UNSOLD");
+
+    if (unsoldCountError) throw unsoldCountError;
+
+    const auctionEnded = (unsoldCount ?? 0) === 0;
+
+    if (auctionEnded) {
+      const { error: sessionUpdateError } = await supabase
+        .from("AuctionSession")
+        .update({
+          restartAckRequired: false,
+          isAuctionEnded: true,
+          auctionEndReason: "UNSOLD_DEPLETED",
+          endedAt: new Date().toISOString(),
+        })
+        .eq("id", session.id);
+
+      if (sessionUpdateError) throw sessionUpdateError;
+    }
+
+    const progression = {
+      nextPlayer: null,
+      didWrap: false,
+      restartedFromAnchor: false,
+      restartAckRequired: false,
+      auctionEnded,
+      endReason: auctionEnded ? "UNSOLD_DEPLETED" : null,
+      currentRound: session.unsoldIterationRound ?? 1,
+    };
 
     const { error: historyError } = await supabase
       .from("AuctionActionHistory")
@@ -167,7 +222,7 @@ export async function POST(req: NextRequest) {
         id: crypto.randomUUID(),
         sessionId: session.id,
         fromPlayerId: playerId,
-        toPlayerId: nextPlayer?.id ?? null,
+        toPlayerId: null,
         actionType: "SELL",
         transactionId: transaction.id,
       });
@@ -176,7 +231,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: { transaction, nextPlayer },
+      data: {
+        transaction,
+        nextPlayer: progression.nextPlayer,
+        progression,
+      },
     });
   } catch (error) {
     logger.error("Failed to sell player", error);

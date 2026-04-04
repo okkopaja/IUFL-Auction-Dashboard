@@ -1,11 +1,10 @@
 "use client";
 
 import { FastForward, Gavel, History, Rewind, Undo2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  useGoPrevious,
-  useNextPlayer,
+  useFocusPlayer,
   usePreviousPlayerPreview,
   useSellPlayer,
   useUndoTransaction,
@@ -33,44 +32,73 @@ interface ApiErrorShape {
 
 export function BidControls({
   player,
+  livePlayer,
+  allPlayers,
   teams,
   logs,
+  controlsLocked = false,
+  onBrowsePlayerChange,
 }: {
   player: Player;
+  livePlayer: Player | null;
+  allPlayers: Player[];
   teams: Team[];
   logs: Transaction[];
+  controlsLocked?: boolean;
+  onBrowsePlayerChange?: (playerId: string | null) => void;
 }) {
   const currentBid = useAuctionStore((state) => state.currentBid);
   const selectedTeamId = useAuctionStore((state) => state.selectedTeamId);
   const setBid = useAuctionStore((state) => state.setBid);
-  const [isViewingSoldPreview, setIsViewingSoldPreview] = useState(false);
+  const [browseIndex, setBrowseIndex] = useState<number | null>(null);
 
   const sellMutation = useSellPlayer();
-  const nextMutation = useNextPlayer();
-  const previousMutation = useGoPrevious();
+  const focusMutation = useFocusPlayer();
   const undoMutation = useUndoTransaction();
-  const {
-    data: previousEntry,
-    isFetching: isLoadingPreviousEntry,
-    isError: hasPreviousEntryError,
-  } = usePreviousPlayerPreview();
+  const { data: previousEntry } = usePreviousPlayerPreview();
 
-  const isPreviewMode = isViewingSoldPreview && Boolean(previousEntry);
-  const isSoldPreview =
-    isPreviewMode &&
-    previousEntry?.actionType === "SELL" &&
-    Boolean(previousEntry.transaction);
+  const liveIndex = useMemo(() => {
+    if (!livePlayer) return -1;
+    return allPlayers.findIndex((candidate) => candidate.id === livePlayer.id);
+  }, [allPlayers, livePlayer]);
+
+  const fallbackIndex = useMemo(
+    () => allPlayers.findIndex((candidate) => candidate.id === player.id),
+    [allPlayers, player.id],
+  );
+
+  const displayedIndex =
+    browseIndex ?? (liveIndex >= 0 ? liveIndex : fallbackIndex);
+  const displayedPlayer =
+    displayedIndex >= 0 ? allPlayers[displayedIndex] : player;
+  const isBrowseMode = browseIndex !== null;
+
   const isMutatingAction =
-    sellMutation.isPending ||
-    nextMutation.isPending ||
-    previousMutation.isPending ||
-    undoMutation.isPending;
+    sellMutation.isPending || focusMutation.isPending || undoMutation.isPending;
+  const isActionLocked = isMutatingAction || controlsLocked;
 
   useEffect(() => {
-    if (!previousEntry && isViewingSoldPreview) {
-      setIsViewingSoldPreview(false);
+    if (browseIndex === null) {
+      return;
     }
-  }, [isViewingSoldPreview, previousEntry]);
+
+    if (browseIndex < 0 || browseIndex >= allPlayers.length) {
+      setBrowseIndex(null);
+    }
+  }, [allPlayers.length, browseIndex]);
+
+  useEffect(() => {
+    if (!onBrowsePlayerChange) {
+      return;
+    }
+
+    if (!isBrowseMode) {
+      onBrowsePlayerChange(null);
+      return;
+    }
+
+    onBrowsePlayerChange(displayedPlayer?.id ?? null);
+  }, [displayedPlayer?.id, isBrowseMode, onBrowsePlayerChange]);
 
   useEffect(() => {
     if (currentBid === 0) {
@@ -131,23 +159,40 @@ export function BidControls({
     setBid(Math.max(AUCTION_START_BID, currentBid - amount));
 
   const isSellDisabled =
-    isMutatingAction ||
-    isPreviewMode ||
+    isActionLocked ||
+    displayedPlayer.status !== "IN_AUCTION" ||
     !selectedTeamId ||
     !selectedTeam ||
     Boolean(currentBidValidationError);
 
-  const reserveHelperText = isPreviewMode
-    ? "Viewing sold player preview. Use Undo to make this player actionable again."
-    : selectedTeamConstraints
-      ? currentBidValidationError
-        ? currentBidValidationError
-        : `Max bid ${selectedTeamConstraints.maxAllowedBid} points. Reserve ${selectedTeamConstraints.reservePointsRequired} for ${selectedTeamConstraints.remainingSlotsAfterPurchase} remaining auction ${selectedTeamConstraints.remainingSlotsAfterPurchase === 1 ? "player" : "players"}.`
-      : "Select a team to see bid limit.";
+  const reserveHelperText = controlsLocked
+    ? "Acknowledge the restart popup to continue auction actions."
+    : displayedPlayer.status === "SOLD"
+      ? "This player is already sold and can be viewed only."
+      : displayedPlayer.status === "UNSOLD"
+        ? "This player is unsold. Move iterator to set this player IN_AUCTION before selling."
+        : selectedTeamConstraints
+          ? currentBidValidationError
+            ? currentBidValidationError
+            : `Max bid ${selectedTeamConstraints.maxAllowedBid} points. Reserve ${selectedTeamConstraints.reservePointsRequired} for ${selectedTeamConstraints.remainingSlotsAfterPurchase} remaining auction ${selectedTeamConstraints.remainingSlotsAfterPurchase === 1 ? "player" : "players"}.`
+          : "Select a team to see bid limit.";
+
+  const moveBrowseIndex = (targetIndex: number) => {
+    if (targetIndex < 0 || targetIndex >= allPlayers.length) {
+      return;
+    }
+
+    setBrowseIndex(targetIndex);
+  };
 
   const handleSell = () => {
-    if (isPreviewMode) {
-      toast.error("Return to live auction before selling.");
+    if (controlsLocked) {
+      toast.error("Acknowledge restart popup before selling.");
+      return;
+    }
+
+    if (displayedPlayer.status !== "IN_AUCTION") {
+      toast.error("Only the active IN_AUCTION player can be sold.");
       return;
     }
 
@@ -172,12 +217,27 @@ export function BidControls({
     }
 
     sellMutation.mutate(
-      { playerId: player.id, teamId: selectedTeamId, amount: currentBid },
       {
-        onSuccess: () => {
+        playerId: displayedPlayer.id,
+        teamId: selectedTeamId,
+        amount: currentBid,
+      },
+      {
+        onSuccess: (result) => {
+          setBrowseIndex(null);
           toast.success(
-            `${player.name} sold to ${selectedTeam?.name} for ${currentBid}`,
+            `${displayedPlayer.name} sold to ${selectedTeam?.name} for ${currentBid}`,
           );
+
+          if (result.progression.auctionEnded) {
+            if (result.progression.endReason === "ITERATION_LIMIT_REACHED") {
+              toast.success(
+                "Auction is ended, Iterated through unsold players twice.",
+              );
+            } else {
+              toast.success("Auction ended. No unsold players remain.");
+            }
+          }
         },
         onError: (err: unknown) => {
           const errorMessage =
@@ -194,58 +254,81 @@ export function BidControls({
   };
 
   const handleNext = () => {
-    if (isPreviewMode) {
-      setIsViewingSoldPreview(false);
+    if (controlsLocked) {
+      toast.error("Acknowledge restart popup before continuing.");
       return;
     }
 
-    nextMutation.mutate(undefined, {
-      onError: () => {
-        toast.error("Error moving to next player");
+    if (displayedIndex < 0 || allPlayers.length === 0) {
+      return;
+    }
+
+    if (displayedIndex >= allPlayers.length - 1) {
+      toast.info("Reached last player in auction order.");
+      return;
+    }
+
+    const targetIndex = displayedIndex + 1;
+    const targetPlayer = allPlayers[targetIndex];
+    if (!targetPlayer) {
+      return;
+    }
+
+    moveBrowseIndex(targetIndex);
+    focusMutation.mutate(
+      { playerId: targetPlayer.id },
+      {
+        onError: () => {
+          toast.error("Error moving to next player");
+        },
       },
-    });
+    );
   };
 
   const handlePrevious = () => {
-    if (isViewingSoldPreview) {
-      setIsViewingSoldPreview(false);
+    if (controlsLocked) {
+      toast.error("Acknowledge restart popup before continuing.");
       return;
     }
 
-    if (hasPreviousEntryError) {
-      toast.error("Could not load previous player.");
+    if (displayedIndex < 0 || allPlayers.length === 0) {
+      toast.error("No players available for traversal.");
       return;
     }
 
-    if (!previousEntry) {
-      toast.error("No previous player available yet.");
+    if (displayedIndex === 0) {
+      toast.info("Reached first player in auction order.");
       return;
     }
 
-    previousMutation.mutate(undefined, {
-      onSuccess: (result) => {
-        if (result.mode === "SELL_PREVIEW") {
-          setIsViewingSoldPreview(true);
-          return;
-        }
+    const targetIndex = displayedIndex - 1;
+    const targetPlayer = allPlayers[targetIndex];
+    if (!targetPlayer) {
+      return;
+    }
 
-        setIsViewingSoldPreview(false);
-        toast.success("Moved back to the previous unsold player.");
+    moveBrowseIndex(targetIndex);
+    focusMutation.mutate(
+      { playerId: targetPlayer.id },
+      {
+        onError: () => {
+          toast.error("Error moving to previous player");
+        },
       },
-      onError: (err: unknown) => {
-        const errorMessage =
-          typeof err === "object" &&
-          err !== null &&
-          typeof (err as ApiErrorShape).response?.data?.error === "string"
-            ? (err as ApiErrorShape).response?.data?.error
-            : "Error moving to previous action";
-
-        toast.error(errorMessage);
-      },
-    });
+    );
   };
 
   const handleUndo = () => {
+    if (controlsLocked) {
+      toast.error("Acknowledge restart popup before undoing.");
+      return;
+    }
+
+    if (displayedPlayer.status !== "IN_AUCTION") {
+      toast.error("Move to the active IN_AUCTION player before undoing.");
+      return;
+    }
+
     undoMutation.mutate(undefined, {
       onSuccess: () => {
         toast.success("Latest sale has been undone.");
@@ -284,8 +367,8 @@ export function BidControls({
               className="h-10 rounded-lg bg-[#1a1a1a] border border-[#333] text-sm font-semibold text-slate-300 hover:text-white hover:bg-[#222] hover:border-[#444] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => handleIncrement(increment)}
               disabled={
-                isMutatingAction ||
-                isPreviewMode ||
+                isActionLocked ||
+                displayedPlayer.status !== "IN_AUCTION" ||
                 (selectedTeamConstraints
                   ? Boolean(
                       getBidValidationError(
@@ -309,14 +392,30 @@ export function BidControls({
               className="h-10 rounded-lg bg-[#1a1a1a] border border-[#333] text-sm font-semibold text-slate-300 hover:text-white hover:bg-[#222] hover:border-[#444] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => handleDecrement(decrement)}
               disabled={
-                isPreviewMode ||
+                displayedPlayer.status !== "IN_AUCTION" ||
+                isActionLocked ||
                 currentBid <= AUCTION_START_BID ||
-                isMutatingAction
+                controlsLocked
               }
             >
               -{decrement}
             </button>
           ))}
+        </div>
+
+        <div className="mt-2 flex w-full items-center justify-between px-1 text-[10px] font-mono uppercase tracking-[0.18em]">
+          <span
+            className={
+              displayedPlayer.status === "IN_AUCTION"
+                ? "text-emerald-300"
+                : "text-amber-300"
+            }
+          >
+            {displayedPlayer.status === "IN_AUCTION"
+              ? "Live Auction"
+              : "View Only"}
+          </span>
+          <span className="text-slate-500">{displayedPlayer.status}</span>
         </div>
 
         <p
@@ -334,92 +433,67 @@ export function BidControls({
       </div>
 
       <div className="relative w-full">
-        {isSoldPreview && previousEntry?.transaction ? (
-          <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center">
-            <div className="-rotate-24 border-4 border-rose-600/90 bg-rose-950/15 px-8 py-2 text-6xl font-black uppercase tracking-[0.2em] text-rose-500/95 [text-shadow:0_0_28px_rgba(244,63,94,0.45)]">
-              SOLD
-            </div>
-            <div className="mt-12 rounded-lg border border-rose-500/40 bg-black/85 px-4 py-2 text-center">
-              <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-slate-400">
-                Sold To
-              </p>
-              <div className="mt-1 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.14em] text-rose-300">
-                <TeamLogo
-                  domain={previousEntry.transaction.team.domain}
-                  name={previousEntry.transaction.team.name}
-                  size={16}
-                />
-                <span>{previousEntry.transaction.team.shortCode}</span>
-                <span className="text-slate-500">|</span>
-                <span>{previousEntry.transaction.amount}</span>
-              </div>
-            </div>
+        {/* Sell Target Information */}
+        <div className="w-full flex flex-col">
+          <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono tracking-widest uppercase mb-2 px-1">
+            <span>Target Franchise</span>
+            {selectedTeamId ? (
+              <span className="text-accent-gold">
+                {selectedTeam?.shortCode} selected
+              </span>
+            ) : (
+              <span className="text-rose-500/80">None Selected</span>
+            )}
           </div>
-        ) : null}
 
-        <div className={isSoldPreview ? "opacity-30" : "opacity-100"}>
-          {/* Sell Target Information */}
-          <div className="w-full flex flex-col">
-            <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono tracking-widest uppercase mb-2 px-1">
-              <span>Target Franchise</span>
-              {selectedTeamId ? (
-                <span className="text-accent-gold">
-                  {selectedTeam?.shortCode} selected
-                </span>
-              ) : (
-                <span className="text-rose-500/80">None Selected</span>
-              )}
-            </div>
+          <button
+            type="button"
+            className="w-full h-12 text-sm font-bold uppercase tracking-widest bg-white text-black hover:bg-[#e0e0e0] transition-colors rounded-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleSell}
+            disabled={isSellDisabled}
+          >
+            <Gavel className="w-5 h-5 mr-3" />
+            {sellMutation.isPending ? "Selling..." : "Sell Player"}
+          </button>
+        </div>
+
+        <div className="mt-3 flex w-full flex-col gap-3">
+          <div className="flex w-full gap-3">
+            <button
+              type="button"
+              className="flex-1 h-10 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handlePrevious}
+              disabled={isActionLocked || displayedIndex <= 0}
+            >
+              <Rewind className="w-4 h-4 mr-2" />
+              Previous
+            </button>
 
             <button
               type="button"
-              className="w-full h-12 text-sm font-bold uppercase tracking-widest bg-white text-black hover:bg-[#e0e0e0] transition-colors rounded-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleSell}
-              disabled={isSellDisabled}
+              className="flex-1 h-10 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleNext}
+              disabled={
+                isActionLocked || displayedIndex >= allPlayers.length - 1
+              }
             >
-              <Gavel className="w-5 h-5 mr-3" />
-              {sellMutation.isPending ? "Selling..." : "Sell Player"}
+              Next
+              <FastForward className="w-4 h-4 ml-2" />
             </button>
           </div>
 
-          <div className="mt-3 flex w-full flex-col gap-3">
-            <div className="flex w-full gap-3">
-              <button
-                type="button"
-                className="flex-1 h-10 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handlePrevious}
-                disabled={
-                  isLoadingPreviousEntry ||
-                  previousMutation.isPending ||
-                  (!previousEntry && !isViewingSoldPreview)
-                }
-              >
-                <Rewind className="w-4 h-4 mr-2" />
-                {isViewingSoldPreview ? "Back To Live" : "Previous"}
-              </button>
-
-              <button
-                type="button"
-                className="flex-1 h-10 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleNext}
-                disabled={isMutatingAction}
-              >
-                Pass / Next
-                <FastForward className="w-4 h-4 ml-2" />
-              </button>
-            </div>
-
-            <div className="flex w-full justify-center">
-              <button
-                type="button"
-                className="h-10 w-full max-w-60 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleUndo}
-                disabled={isMutatingAction}
-              >
-                <Undo2 className="w-4 h-4 mr-2" />
-                Undo
-              </button>
-            </div>
+          <div className="flex w-full justify-center">
+            <button
+              type="button"
+              className="h-10 w-full max-w-60 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleUndo}
+              disabled={
+                isActionLocked || displayedPlayer.status !== "IN_AUCTION"
+              }
+            >
+              <Undo2 className="w-4 h-4 mr-2" />
+              Undo
+            </button>
           </div>
         </div>
       </div>

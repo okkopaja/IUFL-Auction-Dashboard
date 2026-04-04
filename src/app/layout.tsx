@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Attribution } from "@/components/shared/Attribution";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistMono = Geist_Mono({
@@ -46,7 +47,10 @@ export default function RootLayout({
           suppressHydrationWarning
         >
           <ThemeProvider>
-            <QueryProvider>{children}</QueryProvider>
+            <QueryProvider>
+              <Attribution />
+              {children}
+            </QueryProvider>
             <Toaster />
           </ThemeProvider>
         </body>

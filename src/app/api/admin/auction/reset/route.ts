@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireCurrentUserPassword, requireSuperAdmin } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { buildResetSessionPlayerOrder } from "@/lib/resetSessionPlayerOrder";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 const resetAuctionPayloadSchema = z.object({
@@ -10,6 +11,15 @@ const resetAuctionPayloadSchema = z.object({
     .min(1, "Password is required")
     .max(200, "Password is too long"),
 });
+
+type ResetRoutePlayer = {
+  id: string;
+  name: string;
+  position1: string;
+  importOrder: number;
+};
+
+const PLAYER_RESET_UPDATE_BATCH_SIZE = 100;
 
 export async function POST(req: NextRequest) {
   const denied = await requireSuperAdmin();
@@ -74,6 +84,18 @@ export async function POST(req: NextRequest) {
     if (teamCountResult.error) throw teamCountResult.error;
     if (playerCountResult.error) throw playerCountResult.error;
 
+    const { data: sessionPlayers, error: sessionPlayersError } = await supabase
+      .from("Player")
+      .select("id,name,position1,importOrder")
+      .eq("sessionId", sessionId)
+      .order("importOrder", { ascending: true });
+
+    if (sessionPlayersError) throw sessionPlayersError;
+
+    const resetPlayerOrder = await buildResetSessionPlayerOrder(
+      (sessionPlayers ?? []) as ResetRoutePlayer[],
+    );
+
     const { error: deleteHistoryError } = await supabase
       .from("AuctionActionHistory")
       .delete()
@@ -92,11 +114,46 @@ export async function POST(req: NextRequest) {
       .eq("sessionId", sessionId);
     if (resetTeamsError) throw resetTeamsError;
 
-    const { error: resetPlayersError } = await supabase
-      .from("Player")
-      .update({ status: "UNSOLD", teamId: null })
-      .eq("sessionId", sessionId);
-    if (resetPlayersError) throw resetPlayersError;
+    for (
+      let startIndex = 0;
+      startIndex < resetPlayerOrder.orderedPlayers.length;
+      startIndex += PLAYER_RESET_UPDATE_BATCH_SIZE
+    ) {
+      const batch = resetPlayerOrder.orderedPlayers.slice(
+        startIndex,
+        startIndex + PLAYER_RESET_UPDATE_BATCH_SIZE,
+      );
+
+      const updateResults = await Promise.all(
+        batch.map((player, batchIndex) =>
+          supabase
+            .from("Player")
+            .update({
+              status: "UNSOLD",
+              teamId: null,
+              importOrder: startIndex + batchIndex,
+            })
+            .eq("sessionId", sessionId)
+            .eq("id", player.id),
+        ),
+      );
+
+      const failedResult = updateResults.find((result) => result.error);
+      if (failedResult?.error) throw failedResult.error;
+    }
+
+    const { error: resetSessionStateError } = await supabase
+      .from("AuctionSession")
+      .update({
+        unsoldIterationRound: 1,
+        unsoldIterationAnchorPlayerId: null,
+        restartAckRequired: false,
+        isAuctionEnded: false,
+        auctionEndReason: null,
+        endedAt: null,
+      })
+      .eq("id", sessionId);
+    if (resetSessionStateError) throw resetSessionStateError;
 
     return NextResponse.json({
       success: true,
@@ -106,6 +163,11 @@ export async function POST(req: NextRequest) {
         transactionsCleared: txCountResult.count ?? 0,
         teamsReset: teamCountResult.count ?? 0,
         playersUnsold: playerCountResult.count ?? 0,
+        playerOrder: {
+          reorderedPlayers: resetPlayerOrder.orderedPlayers.length,
+          unknownRolePlayers: resetPlayerOrder.unknownRolePlayers,
+          roles: resetPlayerOrder.roleSummaries,
+        },
       },
     });
   } catch (error) {

@@ -4,29 +4,11 @@ import { motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/lib/constants";
+import { BackgroundBeams } from "@/components/ui/background-beams";
 
 export default function Home() {
   return (
-    <main className="relative flex min-h-screen-safe w-full flex-col items-center justify-center overflow-x-hidden bg-[#080a0f] text-white font-sans">
-      {/* Attribution */}
-      <a
-        href="https://github.com/okkopaja"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute top-4 left-6 sm:top-6 sm:left-8 z-50 flex items-center gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-white/40 transition-colors hover:text-[#ccff00]"
-      >
-        <span className="flex items-center gap-1.5">
-          <span>Made with</span>
-          <span className="text-sm">🤖</span>
-          <span>by <span className="text-white/70">github.com/okkopaja</span></span>
-        </span>
-      </a>
-
-      {/* Techy Background Pattern */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#13161e_1px,transparent_1px),linear-gradient(to_bottom,#13161e_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)]" />
-      </div>
-
+    <div className="relative flex min-h-screen-safe w-full flex-col items-center justify-center overflow-x-hidden bg-neutral-950 text-foreground font-sans antialiased">
       <div className="z-10 flex flex-col items-center max-w-5xl px-6 text-center">
         {/* Main Heading Text */}
         <motion.div
@@ -111,7 +93,9 @@ export default function Home() {
       </div>
 
       {/* Decorative Ambient Glow */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ccff00] opacity-[0.03] blur-[120px]" />
-    </main>
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary opacity-[0.05] blur-[120px]" />
+
+      <BackgroundBeams />
+    </div>
   );
 }

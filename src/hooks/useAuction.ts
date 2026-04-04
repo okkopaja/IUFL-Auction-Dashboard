@@ -3,12 +3,31 @@ import { api } from "@/lib/api";
 import { useAuctionStore } from "@/store/auctionStore";
 import type {
   AuctionActionHistoryEntry,
+  AuctionProgressionMeta,
   AuctionStats,
+  CurrentPlayerState,
   Player,
   PreviousActionResponse,
   Team,
   Transaction,
 } from "@/types";
+
+type NextPlayerMutationResponse = {
+  nextPlayer: Player | null;
+  progression: AuctionProgressionMeta;
+};
+
+type SellPlayerMutationResponse = {
+  transaction: Transaction;
+  nextPlayer: Player | null;
+  progression: AuctionProgressionMeta;
+};
+
+type FocusPlayerMutationResponse = {
+  player: Player;
+  isLive: boolean;
+  viewOnly: boolean;
+};
 
 export const QUERY_KEYS = {
   teams: ["teams"],
@@ -60,7 +79,13 @@ export function useCurrentPlayer() {
       return {
         player: (data.data as Player) || null,
         isComplete: Boolean(data.meta?.isComplete),
-      };
+        restartAckRequired: Boolean(data.meta?.restartAckRequired),
+        unsoldIterationRound: Number(data.meta?.unsoldIterationRound ?? 1),
+        isAuctionEnded: Boolean(data.meta?.isAuctionEnded),
+        auctionEndReason: (data.meta?.auctionEndReason ?? null) as
+          | CurrentPlayerState["auctionEndReason"]
+          | null,
+      } satisfies CurrentPlayerState;
     },
   });
 }
@@ -147,7 +172,7 @@ export function useSellPlayer() {
         teamId,
         amount,
       });
-      return data.data;
+      return data.data as SellPlayerMutationResponse;
     },
     onSuccess: (data, variables) => {
       setLastTransaction({
@@ -169,9 +194,7 @@ export function useSellPlayer() {
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.players("IN_AUCTION"),
       });
-      if (data.nextPlayer) {
-        resetForNewPlayer();
-      }
+      resetForNewPlayer();
     },
   });
 }
@@ -183,14 +206,64 @@ export function useNextPlayer() {
   return useMutation({
     mutationFn: async () => {
       const { data } = await api.post("/auction/next");
-      return data.data;
+      return data.data as NextPlayerMutationResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.currentPlayer });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.previousPlayer });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.auctionStats });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.auctionLog });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players("SOLD") });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players("UNSOLD") });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.players("IN_AUCTION"),
+      });
       if (data.nextPlayer) {
         resetForNewPlayer();
       }
+    },
+  });
+}
+
+export function useAcknowledgeAuctionRestart() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post("/auction/restart-ack");
+      return data.data as {
+        acknowledged: boolean;
+        reason?: string;
+        round: number;
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.currentPlayer });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players() });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.players("IN_AUCTION"),
+      });
+    },
+  });
+}
+
+export function useFocusPlayer() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ playerId }: { playerId: string }) => {
+      const { data } = await api.post("/auction/focus", { playerId });
+      return data.data as FocusPlayerMutationResponse;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.currentPlayer });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players("SOLD") });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.players("UNSOLD") });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.players("IN_AUCTION"),
+      });
     },
   });
 }
