@@ -18,10 +18,17 @@ const hookState = vi.hoisted(() => ({
     auctionEndReason: null,
   } as CurrentPlayerState,
   nextMutate: vi.fn(),
+  sellMutate: vi.fn(),
+  focusMutate: vi.fn(),
+  undoMutate: vi.fn(),
   acknowledgeMutate: vi.fn(),
   nextPending: false,
+  sellPending: false,
+  focusPending: false,
+  undoPending: false,
   nextError: false,
   acknowledgePending: false,
+  previousEntry: null as unknown,
 }));
 
 vi.mock("@clerk/nextjs", () => ({
@@ -59,6 +66,21 @@ vi.mock("@/hooks/useAuction", () => ({
     mutate: hookState.acknowledgeMutate,
     isPending: hookState.acknowledgePending,
   }),
+  useSellPlayer: () => ({
+    mutate: hookState.sellMutate,
+    isPending: hookState.sellPending,
+  }),
+  useFocusPlayer: () => ({
+    mutate: hookState.focusMutate,
+    isPending: hookState.focusPending,
+  }),
+  useUndoTransaction: () => ({
+    mutate: hookState.undoMutate,
+    isPending: hookState.undoPending,
+  }),
+  usePreviousPlayerPreview: () => ({
+    data: hookState.previousEntry,
+  }),
 }));
 
 describe("AuctionLayout iteration dialogs", () => {
@@ -66,9 +88,13 @@ describe("AuctionLayout iteration dialogs", () => {
 
   beforeEach(() => {
     hookState.nextMutate.mockReset();
+    hookState.sellMutate.mockReset();
+    hookState.focusMutate.mockReset();
+    hookState.undoMutate.mockReset();
     hookState.acknowledgeMutate.mockReset();
     hookState.teams = [];
     hookState.players = [];
+    hookState.previousEntry = null;
     hookState.current = {
       player: null,
       isComplete: false,
@@ -127,5 +153,46 @@ describe("AuctionLayout iteration dialogs", () => {
     });
 
     expect(navLink.getAttribute("href")).toBe("/v1/public/players");
+  });
+
+  it("uses progression next when sold preview is active", async () => {
+    const soldPreviewPlayer: Player = {
+      id: "p-sold",
+      name: "Sold Preview",
+      position1: "FORWARD",
+      basePrice: 10,
+      status: "SOLD",
+    };
+
+    hookState.teams = [
+      {
+        id: "t1",
+        name: "Team One",
+        shortCode: "ONE",
+        domain: "one.example",
+        pointsTotal: 1000,
+        pointsSpent: 0,
+        pointsRemaining: 1000,
+        playersOwnedCount: 0,
+        sessionId: "session-1",
+        players: [],
+        transactions: [],
+      },
+    ];
+    hookState.players = [soldPreviewPlayer];
+    hookState.current = {
+      player: soldPreviewPlayer,
+      isComplete: false,
+      restartAckRequired: false,
+      unsoldIterationRound: 1,
+      isAuctionEnded: false,
+      auctionEndReason: null,
+    };
+
+    render(<AuctionLayout />);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(hookState.nextMutate).toHaveBeenCalledTimes(1);
   });
 });

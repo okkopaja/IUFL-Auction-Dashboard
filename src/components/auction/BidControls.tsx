@@ -38,6 +38,8 @@ export function BidControls({
   logs,
   controlsLocked = false,
   onBrowsePlayerChange,
+  onAdvanceAuction,
+  unsoldIterationRound = 1,
 }: {
   player: Player;
   livePlayer: Player | null;
@@ -46,6 +48,8 @@ export function BidControls({
   logs: Transaction[];
   controlsLocked?: boolean;
   onBrowsePlayerChange?: (playerId: string | null) => void;
+  onAdvanceAuction?: () => void;
+  unsoldIterationRound?: number;
 }) {
   const currentBid = useAuctionStore((state) => state.currentBid);
   const selectedTeamId = useAuctionStore((state) => state.selectedTeamId);
@@ -57,21 +61,38 @@ export function BidControls({
   const undoMutation = useUndoTransaction();
   const { data: previousEntry } = usePreviousPlayerPreview();
 
+  const isSecondIteration = unsoldIterationRound >= 2;
+  const traversalPlayers = useMemo(() => {
+    if (!isSecondIteration) {
+      return allPlayers;
+    }
+
+    const unsoldTraversalPool = allPlayers.filter(
+      (candidate) => candidate.status !== "SOLD",
+    );
+
+    return unsoldTraversalPool.length > 0 ? unsoldTraversalPool : allPlayers;
+  }, [allPlayers, isSecondIteration]);
+
   const liveIndex = useMemo(() => {
     if (!livePlayer) return -1;
-    return allPlayers.findIndex((candidate) => candidate.id === livePlayer.id);
-  }, [allPlayers, livePlayer]);
+    return traversalPlayers.findIndex(
+      (candidate) => candidate.id === livePlayer.id,
+    );
+  }, [livePlayer, traversalPlayers]);
 
   const fallbackIndex = useMemo(
-    () => allPlayers.findIndex((candidate) => candidate.id === player.id),
-    [allPlayers, player.id],
+    () => traversalPlayers.findIndex((candidate) => candidate.id === player.id),
+    [player.id, traversalPlayers],
   );
 
   const displayedIndex =
     browseIndex ?? (liveIndex >= 0 ? liveIndex : fallbackIndex);
   const displayedPlayer =
-    displayedIndex >= 0 ? allPlayers[displayedIndex] : player;
+    displayedIndex >= 0 ? traversalPlayers[displayedIndex] : player;
   const isBrowseMode = browseIndex !== null;
+  const shouldUseProgressionNext =
+    !isBrowseMode && displayedPlayer.status !== "IN_AUCTION";
 
   const isMutatingAction =
     sellMutation.isPending || focusMutation.isPending || undoMutation.isPending;
@@ -82,10 +103,10 @@ export function BidControls({
       return;
     }
 
-    if (browseIndex < 0 || browseIndex >= allPlayers.length) {
+    if (browseIndex < 0 || browseIndex >= traversalPlayers.length) {
       setBrowseIndex(null);
     }
-  }, [allPlayers.length, browseIndex]);
+  }, [browseIndex, traversalPlayers.length]);
 
   useEffect(() => {
     if (!onBrowsePlayerChange) {
@@ -168,9 +189,13 @@ export function BidControls({
   const reserveHelperText = controlsLocked
     ? "Acknowledge the restart popup to continue auction actions."
     : displayedPlayer.status === "SOLD"
-      ? "This player is already sold and can be viewed only."
+      ? shouldUseProgressionNext
+        ? "This player is already sold and can be viewed only. Press Next to continue auction progression."
+        : "This player is already sold and can be viewed only."
       : displayedPlayer.status === "UNSOLD"
-        ? "This player is unsold. Move iterator to set this player IN_AUCTION before selling."
+        ? shouldUseProgressionNext
+          ? "This player is unsold in view mode. Press Next to continue auction progression."
+          : "This player is unsold. Move iterator to set this player IN_AUCTION before selling."
         : selectedTeamConstraints
           ? currentBidValidationError
             ? currentBidValidationError
@@ -178,7 +203,7 @@ export function BidControls({
           : "Select a team to see bid limit.";
 
   const moveBrowseIndex = (targetIndex: number) => {
-    if (targetIndex < 0 || targetIndex >= allPlayers.length) {
+    if (targetIndex < 0 || targetIndex >= traversalPlayers.length) {
       return;
     }
 
@@ -259,17 +284,28 @@ export function BidControls({
       return;
     }
 
-    if (displayedIndex < 0 || allPlayers.length === 0) {
+    if (shouldUseProgressionNext) {
+      if (!onAdvanceAuction) {
+        toast.error("Could not continue auction progression right now.");
+        return;
+      }
+
+      setBrowseIndex(null);
+      onAdvanceAuction();
       return;
     }
 
-    if (displayedIndex >= allPlayers.length - 1) {
+    if (displayedIndex < 0 || traversalPlayers.length === 0) {
+      return;
+    }
+
+    if (displayedIndex >= traversalPlayers.length - 1) {
       toast.info("Reached last player in auction order.");
       return;
     }
 
     const targetIndex = displayedIndex + 1;
-    const targetPlayer = allPlayers[targetIndex];
+    const targetPlayer = traversalPlayers[targetIndex];
     if (!targetPlayer) {
       return;
     }
@@ -291,7 +327,7 @@ export function BidControls({
       return;
     }
 
-    if (displayedIndex < 0 || allPlayers.length === 0) {
+    if (displayedIndex < 0 || traversalPlayers.length === 0) {
       toast.error("No players available for traversal.");
       return;
     }
@@ -302,7 +338,7 @@ export function BidControls({
     }
 
     const targetIndex = displayedIndex - 1;
-    const targetPlayer = allPlayers[targetIndex];
+    const targetPlayer = traversalPlayers[targetIndex];
     if (!targetPlayer) {
       return;
     }
@@ -474,7 +510,10 @@ export function BidControls({
               className="flex-1 h-10 flex items-center justify-center bg-transparent border border-[#333] hover:bg-[#1a1a1a] text-slate-300 hover:text-white hover:border-[#555] rounded-xl uppercase tracking-wider font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleNext}
               disabled={
-                isActionLocked || displayedIndex >= allPlayers.length - 1
+                isActionLocked ||
+                (shouldUseProgressionNext
+                  ? !onAdvanceAuction
+                  : displayedIndex >= traversalPlayers.length - 1)
               }
             >
               Next

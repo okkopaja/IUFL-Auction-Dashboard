@@ -165,6 +165,62 @@ describe("BidControls browse traversal", () => {
     });
   });
 
+  it("uses auction progression next when sold preview is shown outside browse mode", async () => {
+    const onAdvanceAuction = vi.fn();
+    const soldPreviewAtEnd = buildPlayer({
+      id: "p-end",
+      name: "Sold At End",
+      status: "SOLD",
+    });
+    const playersWithSoldAtEnd: Player[] = [
+      buildPlayer({ id: "p-a", name: "A", status: "UNSOLD" }),
+      buildPlayer({ id: "p-b", name: "B", status: "UNSOLD" }),
+      soldPreviewAtEnd,
+    ];
+
+    render(
+      <BidControls
+        player={soldPreviewAtEnd}
+        livePlayer={soldPreviewAtEnd}
+        allPlayers={playersWithSoldAtEnd}
+        teams={teams}
+        logs={[]}
+        onAdvanceAuction={onAdvanceAuction}
+      />,
+    );
+
+    const nextButton = screen.getByRole("button", { name: /next/i });
+    expect((nextButton as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(nextButton);
+
+    expect(onAdvanceAuction).toHaveBeenCalledTimes(1);
+    expect(hookState.focusMutate).not.toHaveBeenCalled();
+  });
+
+  it("in second iteration, browse traversal skips sold players", async () => {
+    render(
+      <BidControls
+        player={livePlayer}
+        livePlayer={livePlayer}
+        allPlayers={allPlayers}
+        teams={teams}
+        logs={[]}
+        unsoldIterationRound={2}
+      />,
+    );
+
+    const previousButton = screen.getByRole("button", { name: /previous/i });
+    expect((previousButton as HTMLButtonElement).disabled).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(hookState.focusMutate).toHaveBeenCalledTimes(1);
+    expect(hookState.focusMutate.mock.calls[0]?.[0]).toMatchObject({
+      playerId: "p3",
+    });
+  });
+
   it("allows selling only when displayed player is IN_AUCTION", async () => {
     render(
       <BidControls

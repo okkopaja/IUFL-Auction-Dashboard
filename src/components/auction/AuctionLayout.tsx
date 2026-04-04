@@ -47,6 +47,14 @@ function formatCategoryLabel(position: string | null | undefined) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+interface ApiErrorShape {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
+
 export function AuctionLayout() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [browsePlayerId, setBrowsePlayerId] = useState<string | null>(null);
@@ -79,6 +87,7 @@ export function AuctionLayout() {
 
   const livePlayer = current?.player ?? null;
   const restartAckRequired = current?.restartAckRequired ?? false;
+  const unsoldIterationRound = current?.unsoldIterationRound ?? 1;
   const isAuctionEnded = current?.isAuctionEnded ?? false;
   const auctionEndReason = current?.auctionEndReason ?? null;
   const isComplete = current?.isComplete ?? false;
@@ -138,6 +147,26 @@ export function AuctionLayout() {
     player,
     restartAckRequired,
   ]);
+
+  const handleAdvanceAuction = () => {
+    if (isLoadingNextPlayer) {
+      return;
+    }
+
+    setBrowsePlayerId(null);
+    loadNextPlayer(undefined, {
+      onError: (err: unknown) => {
+        const errorMessage =
+          typeof err === "object" &&
+          err !== null &&
+          typeof (err as ApiErrorShape).response?.data?.error === "string"
+            ? (err as ApiErrorShape).response?.data?.error
+            : "Could not advance auction player";
+
+        toast.error(errorMessage);
+      },
+    });
+  };
 
   const handleRestartAcknowledge = () => {
     acknowledgeRestartMutation.mutate(undefined, {
@@ -277,6 +306,8 @@ export function AuctionLayout() {
                   restartAckRequired || acknowledgeRestartMutation.isPending
                 }
                 onBrowsePlayerChange={setBrowsePlayerId}
+                onAdvanceAuction={handleAdvanceAuction}
+                unsoldIterationRound={unsoldIterationRound}
               />
             </div>
           </div>
