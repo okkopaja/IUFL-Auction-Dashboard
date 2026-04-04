@@ -22,6 +22,9 @@ const DEFAULT_CSV_PATH = path.join(
   "Player-sequence.csv",
 );
 
+const FORCED_MIDFIELDER_NAME = "Devkaran Gupta";
+const FORCED_MIDFIELDER_INDEX = 2;
+
 export type ResetSessionPlayer = {
   id: string;
   name: string;
@@ -164,6 +167,32 @@ function shufflePlayers<T>(players: T[], random: () => number) {
   }
 
   return shuffled;
+}
+
+function swapNamedPlayerIntoIndex(
+  players: ResetSessionPlayer[],
+  targetName: string,
+  targetIndex: number,
+) {
+  if (targetIndex < 0 || targetIndex >= players.length) {
+    return players;
+  }
+
+  const normalizedTargetName = normalizeName(targetName);
+  const namedPlayerIndex = players.findIndex(
+    (player) => normalizeName(player.name) === normalizedTargetName,
+  );
+
+  if (namedPlayerIndex === -1 || namedPlayerIndex === targetIndex) {
+    return players;
+  }
+
+  const reorderedPlayers = [...players];
+  const temp = reorderedPlayers[targetIndex];
+  reorderedPlayers[targetIndex] = reorderedPlayers[namedPlayerIndex]!;
+  reorderedPlayers[namedPlayerIndex] = temp!;
+
+  return reorderedPlayers;
 }
 
 export function parseFixedTailSequenceCsv(
@@ -309,7 +338,17 @@ export function computeResetSessionPlayerOrder(
     );
     const shuffledPlayers = shufflePlayers(shuffledPool, random);
 
-    orderedPlayers.push(...shuffledPlayers, ...fixedTailPlayers);
+    const roleOrderedPlayers = [...shuffledPlayers, ...fixedTailPlayers];
+    const adjustedRolePlayers =
+      role === "MIDFIELDER"
+        ? swapNamedPlayerIntoIndex(
+            roleOrderedPlayers,
+            FORCED_MIDFIELDER_NAME,
+            FORCED_MIDFIELDER_INDEX,
+          )
+        : roleOrderedPlayers;
+
+    orderedPlayers.push(...adjustedRolePlayers);
 
     roleSummaries.push({
       role,

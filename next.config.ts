@@ -16,6 +16,25 @@ const nextConfig: NextConfig = {
         ? "tsconfig.build.json"
         : "tsconfig.json",
   },
+  async redirects() {
+    return [
+      {
+        source: "/v1/private/dashboard/:path*",
+        destination: "/",
+        permanent: false,
+      },
+      {
+        source: "/v1/public/players/sold/:path*",
+        destination: "/",
+        permanent: false,
+      },
+      {
+        source: "/v1/public/players/unsold/:path*",
+        destination: "/",
+        permanent: false,
+      },
+    ];
+  },
   allowedDevOrigins: ["localtesting.fastcrew.in"],
   images: {
     remotePatterns: [

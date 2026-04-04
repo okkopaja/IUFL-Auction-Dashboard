@@ -100,6 +100,55 @@ describe("resetSessionPlayerOrder", () => {
     });
   });
 
+  it("swaps Devkaran Gupta into 3rd midfielder position on reset ordering", () => {
+    const players: ResetSessionPlayer[] = [
+      buildPlayer({
+        id: "m1",
+        name: "Devkaran Gupta",
+        position1: "MID",
+        importOrder: 0,
+      }),
+      buildPlayer({
+        id: "m2",
+        name: "Midfielder Two",
+        position1: "MID",
+        importOrder: 1,
+      }),
+      buildPlayer({
+        id: "m3",
+        name: "Midfielder Three",
+        position1: "MID",
+        importOrder: 2,
+      }),
+      buildPlayer({
+        id: "m4",
+        name: "Midfielder Four",
+        position1: "MID",
+        importOrder: 3,
+      }),
+    ];
+
+    const result = computeResetSessionPlayerOrder(players, buildFixedTail(), {
+      random: () => 0,
+    });
+
+    const orderedMidfielders = result.orderedPlayers.filter(
+      (player) => player.position1 === "MID",
+    );
+
+    expect(orderedMidfielders).toHaveLength(4);
+    expect(orderedMidfielders[2]?.name).toBe("Devkaran Gupta");
+    expect(orderedMidfielders.map((player) => player.id)).toEqual([
+      "m2",
+      "m3",
+      "m1",
+      "m4",
+    ]);
+    expect(new Set(orderedMidfielders.map((player) => player.id))).toEqual(
+      new Set(["m1", "m2", "m3", "m4"]),
+    );
+  });
+
   it("keeps global role blocks ordered and appends unknown-role players at the end", () => {
     const players: ResetSessionPlayer[] = [
       buildPlayer({
