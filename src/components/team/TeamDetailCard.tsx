@@ -3,6 +3,8 @@
 import { ArrowLeft, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { PlayerDetailsDialog } from "@/components/dashboard/PlayerListView";
+import type { Player } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTeam } from "@/hooks/useAuction";
 import { ROUTES, TEAM_COLORS } from "@/lib/constants";
@@ -27,6 +29,7 @@ function formatSoldAmount(amount: number | null | undefined): string {
 
 export function TeamDetailCard({ teamId }: { teamId: string }) {
   const { data: team, isLoading, error, refetch } = useTeam(teamId);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   if (isLoading) return <LoadingState />;
   if (error)
@@ -143,7 +146,8 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
               {team.players.map((player) => (
                 <div
                   key={player.id}
-                  className="bg-pitch-900/50 border border-slate-800/80 rounded-xl p-4 flex flex-col gap-3"
+                  className="bg-pitch-900/50 border border-slate-800/80 rounded-xl p-4 flex flex-col gap-3 cursor-pointer active:scale-[0.98] hover:bg-slate-800/40 hover:border-slate-700 transition-all hover:shadow-lg"
+                  onClick={() => setSelectedPlayer(player as Player)}
                 >
                   <div className="flex justify-between items-start">
                     <div className="font-semibold text-slate-200 text-lg">
@@ -189,9 +193,10 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
                   {team.players.map((player) => (
                     <TableRow
                       key={player.id}
-                      className="border-slate-800 hover:bg-slate-800/30 transition-colors"
+                      className="border-slate-800 hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                      onClick={() => setSelectedPlayer(player as Player)}
                     >
-                      <TableCell className="font-bold text-slate-200 pl-6 md:pl-8 text-base py-4">
+                      <TableCell className="font-bold text-slate-200 pl-6 md:pl-8 text-base py-4 group-hover:text-accent-gold transition-colors">
                         {player.name}
                       </TableCell>
                       <TableCell className="text-slate-400 font-mono text-xs font-bold uppercase tracking-wider">
@@ -223,6 +228,12 @@ export function TeamDetailCard({ teamId }: { teamId: string }) {
           </div>
         )}
       </div>
+
+      <PlayerDetailsDialog
+        player={selectedPlayer}
+        status="ALL"
+        onOpenChange={(open) => !open && setSelectedPlayer(null)}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   Activity,
   AlertCircle,
   ChevronRight,
+  FileSpreadsheet,
   Gavel,
   Image,
   LogOut,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { ROUTES } from "@/lib/constants";
 import { IconsImportPanel } from "./icons-import/IconsImportPanel";
+import { TeamWiseExportPanel } from "./player-export/TeamWiseExportPanel";
 import { PlayerImportPanel } from "./player-import/PlayerImportPanel";
 
 interface TransactionLog {
@@ -468,6 +470,15 @@ export function AdminDashboardView() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* ── Team-wise Player Export ───────────────────────────────────── */}
+        <div className="rounded-2xl border border-slate-800 bg-pitch-900/50 backdrop-blur-md p-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2 text-slate-300 font-semibold">
+            <FileSpreadsheet className="size-5 text-accent-blue" />
+            Team-wise Player Export
+          </div>
+          <TeamWiseExportPanel />
+        </div>
 
         {/* ── Icons Import ─────────────────────────────────────────────── */}
         <div className="rounded-2xl border border-slate-800 bg-pitch-900/50 backdrop-blur-md p-6 flex flex-col gap-5">

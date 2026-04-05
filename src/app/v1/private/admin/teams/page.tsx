@@ -8,7 +8,7 @@ import { ROUTES } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Admin Teams — IUFL 2026 Auction",
   description:
-    "Dedicated team management for owner, co-owner, captain, and marquee profiles.",
+    "Dedicated team and squad management for roles, points, and player assignment.",
   robots: { index: false, follow: false },
 };
 
@@ -25,8 +25,7 @@ export default function AdminTeamsPage() {
               Teams Management
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Edit owner, co-owner, captain, and marquee details with direct
-              image uploads.
+              Manage team roles, total points, and squad player assignments.
             </p>
           </div>
         </div>
@@ -47,7 +46,8 @@ export default function AdminTeamsPage() {
         <p className="text-sm text-slate-500 leading-relaxed">
           Drop an image into a role card to upload it to Supabase Storage. If an
           image already exists, you can preview it and use Edit Image to replace
-          it.
+          it. You can also add UNSOLD players to team rosters with an amount and
+          remove sold players back to UNSOLD with reversal.
         </p>
         <AdminTeamsBlock />
       </div>

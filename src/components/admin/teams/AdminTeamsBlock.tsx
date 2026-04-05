@@ -19,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PLAYER_BASE_PRICE } from "@/lib/constants";
 import { toDisplayImageUrl } from "@/lib/imageUrl";
-import type { Team, TeamRoleSlot } from "@/types";
+import type { Player, Team, TeamRoleSlot } from "@/types";
 
 const MAX_TEAM_ROLE_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -45,6 +46,10 @@ const TEAM_ROLE_LABEL_BY_KEY: Record<TeamRoleFieldKey, string> = {
 
 function fetchTeams() {
   return fetch("/api/teams").then((res) => res.json());
+}
+
+function fetchPlayers() {
+  return fetch("/api/players").then((res) => res.json());
 }
 
 function isRoleConfigured(role?: TeamRoleSlot): boolean {
@@ -139,6 +144,15 @@ export function AdminTeamsBlock() {
   const [savingPointsTeamId, setSavingPointsTeamId] = useState<string | null>(
     null,
   );
+  const [assignmentTeam, setAssignmentTeam] = useState<Team | null>(null);
+  const [unsoldSearch, setUnsoldSearch] = useState("");
+  const [selectedUnsoldPlayerId, setSelectedUnsoldPlayerId] = useState<
+    string | null
+  >(null);
+  const [assignmentAmount, setAssignmentAmount] = useState(
+    String(PLAYER_BASE_PRICE),
+  );
+  const [removingPlayerId, setRemovingPlayerId] = useState<string | null>(null);
   const fileInputRefs = useRef<
     Record<TeamRoleFieldKey, HTMLInputElement | null>
   >({
@@ -153,8 +167,29 @@ export function AdminTeamsBlock() {
     queryFn: fetchTeams,
   });
 
+  const { data: playersData, isLoading: isPlayersLoading } = useQuery({
+    queryKey: ["admin-players"],
+    queryFn: fetchPlayers,
+  });
+
   const teams: Team[] = data?.data || [];
+  const players: Player[] = playersData?.data || [];
   const isUploadingAnyImage = Object.values(uploadingByRole).some(Boolean);
+
+  const invalidateSquadQueries = async (teamId: string) => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["admin-teams"] }),
+      qc.invalidateQueries({ queryKey: ["teams"] }),
+      qc.invalidateQueries({ queryKey: ["team", teamId] }),
+      qc.invalidateQueries({ queryKey: ["team"] }),
+      qc.invalidateQueries({ queryKey: ["admin-players"] }),
+      qc.invalidateQueries({ queryKey: ["players"] }),
+      qc.invalidateQueries({ queryKey: ["auctionStats"] }),
+      qc.invalidateQueries({ queryKey: ["auctionLog"] }),
+      qc.invalidateQueries({ queryKey: ["currentPlayer"] }),
+      qc.invalidateQueries({ queryKey: ["auction-current"] }),
+    ]);
+  };
 
   const { mutateAsync: updateRoles, isPending: isSavingRoles } = useMutation({
     mutationFn: async ({
@@ -251,6 +286,96 @@ export function AdminTeamsBlock() {
           error instanceof Error
             ? error.message
             : "Failed to update team points",
+        );
+      },
+    });
+
+  const { mutateAsync: addPlayerToTeam, isPending: isAddingPlayer } =
+    useMutation({
+      mutationFn: async ({
+        teamId,
+        playerId,
+        amount,
+      }: {
+        teamId: string;
+        playerId: string;
+        amount: number;
+      }) => {
+        const res = await fetch(`/api/admin/teams/${teamId}/players`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId, amount }),
+        });
+
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || "Failed to add player to team");
+        }
+
+        return json.data as {
+          playerId: string;
+          playerName: string;
+          teamId: string;
+          amount: number;
+          transactionId: string;
+        };
+      },
+      onSuccess: async (data, variables) => {
+        toast.success(
+          `${data.playerName} added to team for ${data.amount.toLocaleString()} pts`,
+        );
+        setAssignmentTeam(null);
+        setUnsoldSearch("");
+        setSelectedUnsoldPlayerId(null);
+        setAssignmentAmount(String(PLAYER_BASE_PRICE));
+
+        await invalidateSquadQueries(variables.teamId);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to add player",
+        );
+      },
+    });
+
+  const { mutateAsync: removePlayerFromTeam, isPending: isRemovingPlayer } =
+    useMutation({
+      mutationFn: async ({
+        teamId,
+        playerId,
+      }: {
+        teamId: string;
+        playerId: string;
+      }) => {
+        const res = await fetch(`/api/admin/teams/${teamId}/players`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ playerId }),
+        });
+
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || "Failed to remove player from team");
+        }
+
+        return json.data as {
+          playerId: string;
+          playerName: string;
+          teamId: string;
+          amount: number;
+          transactionId: string;
+        };
+      },
+      onSuccess: async (data, variables) => {
+        toast.success(
+          `${data.playerName} moved to UNSOLD and ${data.amount.toLocaleString()} pts reversed`,
+        );
+
+        await invalidateSquadQueries(variables.teamId);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to remove player",
         );
       },
     });
@@ -461,6 +586,81 @@ export function AdminTeamsBlock() {
     }
   };
 
+  const isSquadMutationPending = isAddingPlayer || isRemovingPlayer;
+
+  const unsoldPlayers = players.filter(
+    (player) => player.status === "UNSOLD" && !player.teamId,
+  );
+  const normalizedUnsoldSearch = unsoldSearch.trim().toLowerCase();
+  const filteredUnsoldPlayers = unsoldPlayers.filter((player) => {
+    if (normalizedUnsoldSearch.length === 0) return true;
+    const searchable = [player.name, player.position1, player.position2]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return searchable.includes(normalizedUnsoldSearch);
+  });
+
+  const selectedUnsoldPlayer =
+    unsoldPlayers.find((player) => player.id === selectedUnsoldPlayerId) ??
+    null;
+
+  const handleOpenAssignmentDialog = (team: Team) => {
+    setAssignmentTeam(team);
+    setUnsoldSearch("");
+    setSelectedUnsoldPlayerId(null);
+    setAssignmentAmount(String(PLAYER_BASE_PRICE));
+  };
+
+  const handleCloseAssignmentDialog = () => {
+    if (isAddingPlayer) return;
+    setAssignmentTeam(null);
+    setUnsoldSearch("");
+    setSelectedUnsoldPlayerId(null);
+    setAssignmentAmount(String(PLAYER_BASE_PRICE));
+  };
+
+  const handleAssignUnsoldPlayer = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!assignmentTeam) return;
+
+    if (!selectedUnsoldPlayerId) {
+      toast.error("Select an UNSOLD player to add");
+      return;
+    }
+
+    const parsedAmount = parseWholeNumber(assignmentAmount);
+    if (parsedAmount === null || parsedAmount <= 0) {
+      toast.error("Amount must be a positive whole number");
+      return;
+    }
+
+    await addPlayerToTeam({
+      teamId: assignmentTeam.id,
+      playerId: selectedUnsoldPlayerId,
+      amount: parsedAmount,
+    });
+  };
+
+  const handleRemoveToUnsold = async (team: Team, player: Player) => {
+    const confirmed = confirm(
+      `Move ${player.name} from ${team.name} back to UNSOLD and reverse the sale amount?`,
+    );
+    if (!confirmed) return;
+
+    setRemovingPlayerId(player.id);
+    try {
+      await removePlayerFromTeam({
+        teamId: team.id,
+        playerId: player.id,
+      });
+    } finally {
+      setRemovingPlayerId(null);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -490,6 +690,12 @@ export function AdminTeamsBlock() {
                   : null;
               const isSavingCurrentTeamPoints =
                 isSavingPoints && savingPointsTeamId === team.id;
+              const teamSoldPlayers = players
+                .filter(
+                  (player) =>
+                    player.status === "SOLD" && player.teamId === team.id,
+                )
+                .sort((a, b) => a.name.localeCompare(b.name));
 
               return (
                 <div
@@ -633,6 +839,87 @@ export function AdminTeamsBlock() {
                     )}
                   </div>
 
+                  <div className="rounded-xl border border-slate-800/80 bg-pitch-950/50 p-3.5 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+                        Squad Management
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-700 bg-slate-900/40 text-slate-300 hover:border-slate-500 hover:bg-slate-800/60"
+                        onClick={() => handleOpenAssignmentDialog(team)}
+                        disabled={
+                          isPlayersLoading ||
+                          isSquadMutationPending ||
+                          unsoldPlayers.length === 0
+                        }
+                      >
+                        Add Unsold Player
+                      </Button>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500">
+                      Team sold roster: {teamSoldPlayers.length} player
+                      {teamSoldPlayers.length === 1 ? "" : "s"}
+                    </p>
+
+                    {teamSoldPlayers.length === 0 ? (
+                      <p className="text-[11px] text-slate-500">
+                        No sold players assigned to this team yet.
+                      </p>
+                    ) : (
+                      <div className="max-h-36 overflow-y-auto pr-1 flex flex-col gap-1.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                        {teamSoldPlayers.map((player) => {
+                          const isRemovingCurrentPlayer =
+                            isRemovingPlayer && removingPlayerId === player.id;
+
+                          return (
+                            <div
+                              key={player.id}
+                              className="rounded-lg border border-slate-800/70 bg-pitch-900/70 px-2.5 py-2 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-200 truncate">
+                                  {player.name}
+                                </p>
+                                <p className="text-[10px] text-slate-500 truncate">
+                                  {[player.position1, player.position2]
+                                    .filter(Boolean)
+                                    .join(" • ")}
+                                  {typeof player.transactionAmount === "number"
+                                    ? ` • ${player.transactionAmount.toLocaleString()} pts`
+                                    : ""}
+                                </p>
+                              </div>
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
+                                onClick={() =>
+                                  void handleRemoveToUnsold(team, player)
+                                }
+                                disabled={isSquadMutationPending}
+                              >
+                                {isRemovingCurrentPlayer ? (
+                                  <>
+                                    <Loader2 className="size-3.5 mr-1 animate-spin" />
+                                    Removing...
+                                  </>
+                                ) : (
+                                  "Remove"
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <Button
                     type="button"
                     variant="outline"
@@ -653,7 +940,7 @@ export function AdminTeamsBlock() {
         open={!!selectedTeam}
         onOpenChange={(open) => !open && handleCloseEditor()}
       >
-        <DialogContent className="w-[min(96vw,1120px)] max-w-[min(96vw,1120px)] sm:max-w-[1120px] max-h-[92vh] bg-pitch-900 border-slate-800 text-slate-200 p-0 overflow-hidden sm:rounded-2xl shadow-2xl">
+        <DialogContent className="w-[min(96vw,1120px)] max-w-[min(96vw,1120px)] sm:max-w-280 max-h-[92vh] bg-pitch-900 border-slate-800 text-slate-200 p-0 overflow-hidden sm:rounded-2xl shadow-2xl">
           {selectedTeam ? (
             <form onSubmit={handleSubmit} className="flex flex-col">
               <DialogHeader className="px-8 pt-7 pb-3 border-b border-slate-800/80 bg-pitch-950/35">
@@ -835,6 +1122,153 @@ export function AdminTeamsBlock() {
                     : isUploadingAnyImage
                       ? "Uploading images..."
                       : "Save Team Members"}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!assignmentTeam}
+        onOpenChange={(open) => !open && handleCloseAssignmentDialog()}
+      >
+        <DialogContent className="max-w-2xl bg-pitch-900 border-slate-800 text-slate-200 p-0 overflow-hidden sm:rounded-2xl shadow-2xl">
+          {assignmentTeam ? (
+            <form onSubmit={handleAssignUnsoldPlayer} className="flex flex-col">
+              <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-800/80 bg-pitch-950/35">
+                <DialogTitle className="text-xl font-bold text-slate-100">
+                  Add Unsold Player to {assignmentTeam.name}
+                </DialogTitle>
+                <DialogDescription className="text-slate-500">
+                  Select an UNSOLD player and enter the sale amount to add the
+                  player to this team.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="px-6 py-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="assignment-player-search"
+                    className="text-xs text-slate-500 uppercase tracking-widest"
+                  >
+                    Search Unsold Players
+                  </label>
+                  <input
+                    id="assignment-player-search"
+                    type="text"
+                    value={unsoldSearch}
+                    onChange={(event) => setUnsoldSearch(event.target.value)}
+                    placeholder="Search by name or position"
+                    className="w-full bg-pitch-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-accent-gold/50 focus:ring-1 focus:ring-accent-gold/50 transition-all"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-slate-800/80 bg-pitch-950/50 p-2">
+                  <div className="max-h-56 overflow-y-auto pr-1 flex flex-col gap-1.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    {isPlayersLoading ? (
+                      <div className="flex justify-center py-6">
+                        <Loader2 className="size-5 text-accent-gold animate-spin" />
+                      </div>
+                    ) : filteredUnsoldPlayers.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-4">
+                        No UNSOLD players match this search.
+                      </p>
+                    ) : (
+                      filteredUnsoldPlayers.map((player) => {
+                        const isSelected = selectedUnsoldPlayerId === player.id;
+                        return (
+                          <button
+                            type="button"
+                            key={player.id}
+                            onClick={() => setSelectedUnsoldPlayerId(player.id)}
+                            className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                              isSelected
+                                ? "border-accent-gold/60 bg-accent-gold/10"
+                                : "border-slate-800 bg-pitch-900/70 hover:border-slate-600"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-slate-200">
+                              {player.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              {[player.position1, player.position2]
+                                .filter(Boolean)
+                                .join(" • ")}
+                            </p>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="assignment-amount"
+                      className="text-xs text-slate-500 uppercase tracking-widest"
+                    >
+                      Sale Amount (Points)
+                    </label>
+                    <input
+                      id="assignment-amount"
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      value={assignmentAmount}
+                      onChange={(event) =>
+                        setAssignmentAmount(event.target.value)
+                      }
+                      className="w-full bg-pitch-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-accent-gold/50 focus:ring-1 focus:ring-accent-gold/50 transition-all"
+                    />
+                  </div>
+
+                  <div className="rounded-lg border border-slate-800/80 bg-pitch-950/40 p-3">
+                    <p className="text-xs text-slate-500 uppercase tracking-widest">
+                      Selected Player
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-200 truncate">
+                      {selectedUnsoldPlayer?.name ?? "No player selected"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {selectedUnsoldPlayer
+                        ? [
+                            selectedUnsoldPlayer.position1,
+                            selectedUnsoldPlayer.position2,
+                          ]
+                            .filter(Boolean)
+                            .join(" • ")
+                        : "Choose a player from the list above"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-slate-800 bg-pitch-950/50 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-slate-400 hover:text-slate-200"
+                  onClick={handleCloseAssignmentDialog}
+                  disabled={isAddingPlayer}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-accent-gold/20 border border-accent-gold/40 text-accent-gold hover:bg-accent-gold/30 hover:border-accent-gold/70"
+                  disabled={isAddingPlayer || !selectedUnsoldPlayerId}
+                >
+                  {isAddingPlayer ? (
+                    <>
+                      <Loader2 className="size-3.5 mr-1 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    "Add Player to Team"
+                  )}
                 </Button>
               </div>
             </form>
