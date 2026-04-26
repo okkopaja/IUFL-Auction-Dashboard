@@ -124,6 +124,15 @@ export function WatchgodView() {
                 Watcher Team
               </Button>
             </Link>
+            <Link href="/watchgod/teams-dist" className="flex-1 sm:flex-none">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-violet-500/50 bg-violet-500/10 text-xs sm:text-sm text-violet-300 hover:bg-violet-500/20"
+              >
+                Teams Dist
+              </Button>
+            </Link>
             <div className="flex shrink-0 items-center justify-center">
               <UserButton
                 appearance={{

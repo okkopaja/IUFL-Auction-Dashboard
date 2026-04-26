@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/teams-dist-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tournament {
+  id          String           @id @default(cuid())
+  name        String
+  formatType  String           @default("groups_16")
+  totalTeams  Int              @default(16)
+  status      TournamentStatus @default(SETUP)
+  createdBy   String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  teams            TdTeam[]
+  groupAssignments TdGroupAssignment[]
+  drawActions      TdDrawAction[]
+  watchdogStages   TdWatchdogStage[]
+  watchdogSpinState TdWatchdogSpinState?
+}
+
+model TdTeam {
+  id            String     @id @default(cuid())
+  tournamentId  String
+  tournament    Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name          String
+  shortName     String?
+  country       String?
+  crestUrl      String?
+  seedPot       Int?
+  importedOrder Int        @default(0)
+  createdAt     DateTime   @default(now())
+
+  groupAssignment  TdGroupAssignment?
+  watchdogStages   TdWatchdogStage[]
+
+  @@unique([tournamentId, name])
+  @@index([tournamentId])
+}
+
+model TdGroupAssignment {
+  id           String       @id @default(cuid())
+  tournamentId String
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId       String       @unique
+  team         TdTeam       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  groupName    String // "A", "B", "C", "D"
+  slotIndex    Int // 0-3 within each group
+  drawMode     DrawMode
+  actionId     String
+  action       TdDrawAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  assignedAt   DateTime     @default(now())
+
+  @@unique([tournamentId, groupName, slotIndex])
+  @@index([tournamentId, groupName])
+  @@index([actionId])
+}
+
+model TdDrawAction {
+  id           String         @id @default(cuid())
+  tournamentId String
+  tournament   Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  actionType   DrawActionType
+  payloadJson  Json
+  reversible   Boolean        @default(true)
+  reverted     Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  createdBy    String?
+
+  groupAssignments TdGroupAssignment[]
+
+  @@index([tournamentId, createdAt])
+}
+
+enum TournamentStatus {
+  SETUP
+  TEAMS_READY
+  DRAW_IN_PROGRESS
+  DRAW_COMPLETE
+}
+
+enum DrawMode {
+  SINGLE
+  BATCH
+}
+
+enum DrawActionType {
+  SINGLE
+  BATCH
+  UNDO
+  RESET
+}
+
+// Remove unused WatchdogStageStatus enum — replaced by simple drawMode field
+
+model TdWatchdogStage {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId       String
+  team         TdTeam     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  groupName    String     // "A" | "B" | "C" | "D"
+  drawMode     String     // "SINGLE" | "BATCH"
+  createdAt    DateTime   @default(now())
+
+  @@index([tournamentId])
+  @@index([tournamentId, drawMode])
+}
+
+model TdWatchdogSpinState {
+  id           String   @id @default(cuid())
+  tournamentId String   @unique
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  isSpinning   Boolean  @default(false)
+  drawMode     String?  // "single" | "batch"
+  updatedAt    DateTime @updatedAt
+}

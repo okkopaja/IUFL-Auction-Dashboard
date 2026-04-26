@@ -17,7 +17,17 @@
     "lint": "biome check",
     "format": "biome format --write",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "td:generate": "prisma generate --schema prisma/teams-dist/schema.prisma",
+    "td:migrate": "prisma migrate dev --config prisma-teams-dist.config.ts",
+    "td:seed": "tsx prisma/teams-dist/seed.ts",
+    "storage:audit": "tsx scripts/storage/audit.ts",
+    "storage:cleanup": "tsx scripts/storage/cleanup.ts",
+    "storage:cleanup:apply": "tsx scripts/storage/cleanup.ts --apply",
+    "storage:cleanup:restricted": "tsx scripts/storage/recoverRestrictedStorage.ts",
+    "storage:cleanup:restricted:apply": "tsx scripts/storage/recoverRestrictedStorage.ts --apply",
+    "storage:recompress": "tsx scripts/storage/recompress.ts",
+    "storage:recompress:apply": "tsx scripts/storage/recompress.ts --apply"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -41,6 +51,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
+    "sharp": "^0.34.5",
     "shadcn": "^4.1.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

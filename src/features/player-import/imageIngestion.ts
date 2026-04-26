@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveImageType } from "@/lib/imageType";
+import {
+  buildVariantStoragePaths,
+  createWebpVariants,
+  shouldGenerateWebpVariants,
+} from "@/lib/imageVariants";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/supabase";
 import { buildDriveDownloadUrl, classifyImageUrl } from "./driveImage";
@@ -62,9 +67,8 @@ function buildStoragePath(
   sessionId: string,
   playerId: string,
   sourceHash: string,
-  extension: string,
 ): string {
-  return `players/${sessionId}/${playerId}/${sourceHash}.${extension}`;
+  return `players/${sessionId}/${playerId}/${sourceHash}`;
 }
 
 function toProgress(
@@ -530,26 +534,77 @@ async function processClaimedJob(
       );
     }
 
-    const storagePath = buildStoragePath(
+    const storageBasePath = buildStoragePath(
       job.sessionId,
       job.playerId,
       job.sourceHash,
-      resolvedType.extension,
     );
 
-    const { error: uploadError } = await supabase.storage
-      .from(PLAYER_IMAGES_BUCKET)
-      .upload(storagePath, fetched.buffer, {
-        upsert: true,
-        contentType: resolvedType.contentType,
-        cacheControl: "31536000",
-      });
+    const shouldCreateVariants = shouldGenerateWebpVariants(resolvedType);
+    const variants = shouldCreateVariants
+      ? await createWebpVariants(fetched.buffer)
+      : null;
 
-    if (uploadError) {
-      throw new IngestionError(
-        `Supabase upload failed: ${uploadError.message}`,
-        true,
-      );
+    let storagePath: string;
+    let uploadedContentType = resolvedType.contentType;
+    let uploadedContentLength = fetched.buffer.length;
+
+    if (variants) {
+      const { detailPath, thumbPath } =
+        buildVariantStoragePaths(storageBasePath);
+
+      const [{ error: detailUploadError }, { error: thumbUploadError }] =
+        await Promise.all([
+          supabase.storage
+            .from(PLAYER_IMAGES_BUCKET)
+            .upload(detailPath, variants.detailBytes, {
+              upsert: true,
+              contentType: "image/webp",
+              cacheControl: "31536000",
+            }),
+          supabase.storage
+            .from(PLAYER_IMAGES_BUCKET)
+            .upload(thumbPath, variants.thumbBytes, {
+              upsert: true,
+              contentType: "image/webp",
+              cacheControl: "31536000",
+            }),
+        ]);
+
+      if (detailUploadError) {
+        throw new IngestionError(
+          `Supabase upload failed: ${detailUploadError.message}`,
+          true,
+        );
+      }
+
+      if (thumbUploadError) {
+        throw new IngestionError(
+          `Supabase upload failed: ${thumbUploadError.message}`,
+          true,
+        );
+      }
+
+      storagePath = detailPath;
+      uploadedContentType = "image/webp";
+      uploadedContentLength = variants.detailBytes.length;
+    } else {
+      storagePath = `${storageBasePath}.${resolvedType.extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(PLAYER_IMAGES_BUCKET)
+        .upload(storagePath, fetched.buffer, {
+          upsert: true,
+          contentType: resolvedType.contentType,
+          cacheControl: "31536000",
+        });
+
+      if (uploadError) {
+        throw new IngestionError(
+          `Supabase upload failed: ${uploadError.message}`,
+          true,
+        );
+      }
     }
 
     const publicUrl = supabase.storage
@@ -576,8 +631,8 @@ async function processClaimedJob(
       .update({
         status: "COMPLETED",
         storagePath,
-        contentType: resolvedType.contentType,
-        contentLength: fetched.buffer.length,
+        contentType: uploadedContentType,
+        contentLength: uploadedContentLength,
         nextAttemptAt: null,
         lastError: null,
         finishedAt: nowIso,

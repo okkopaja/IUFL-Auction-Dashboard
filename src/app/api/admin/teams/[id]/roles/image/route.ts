@@ -3,6 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { resolveImageType } from "@/lib/imageType";
+import {
+  buildVariantStoragePaths,
+  createWebpVariants,
+  shouldGenerateWebpVariants,
+} from "@/lib/imageVariants";
 import { logger } from "@/lib/logger";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { TEAM_ROLE_FIELD_TO_DB_ROLE } from "@/lib/teamRoles";
@@ -14,11 +19,7 @@ const TEAM_ROLE_IMAGES_BUCKET =
 const roleFieldSchema = z.enum(["owner", "coOwner", "captain", "marquee"]);
 type TeamRoleField = z.infer<typeof roleFieldSchema>;
 
-function buildStoragePath(
-  teamId: string,
-  roleField: TeamRoleField,
-  extension: string,
-) {
+function buildStoragePath(teamId: string, roleField: TeamRoleField) {
   const dbRole = TEAM_ROLE_FIELD_TO_DB_ROLE[roleField].toLowerCase();
   const now = new Date();
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
@@ -32,7 +33,7 @@ function buildStoragePath(
     String(now.getUTCFullYear()),
     month,
     day,
-    `${randomUUID()}.${extension}`,
+    randomUUID(),
   ].join("/");
 }
 
@@ -121,27 +122,71 @@ export async function POST(
       );
     }
 
-    const storagePath = buildStoragePath(
-      teamId,
-      parsedRole.data,
-      imageType.extension,
-    );
+    const storageBasePath = buildStoragePath(teamId, parsedRole.data);
+    const shouldCreateVariants = shouldGenerateWebpVariants(imageType);
+    const variants = shouldCreateVariants
+      ? await createWebpVariants(bytes)
+      : null;
 
-    const { error: uploadError } = await supabase.storage
-      .from(TEAM_ROLE_IMAGES_BUCKET)
-      .upload(storagePath, bytes, {
-        upsert: false,
-        cacheControl: "31536000",
-        contentType: imageType.contentType,
-      });
+    let imageUrl: string | null = null;
+    let thumbnailUrl: string | null = null;
 
-    if (uploadError) {
-      throw new Error(`Supabase upload failed: ${uploadError.message}`);
+    if (variants) {
+      const { detailPath, thumbPath } =
+        buildVariantStoragePaths(storageBasePath);
+
+      const [{ error: detailUploadError }, { error: thumbUploadError }] =
+        await Promise.all([
+          supabase.storage
+            .from(TEAM_ROLE_IMAGES_BUCKET)
+            .upload(detailPath, variants.detailBytes, {
+              upsert: false,
+              cacheControl: "31536000",
+              contentType: "image/webp",
+            }),
+          supabase.storage
+            .from(TEAM_ROLE_IMAGES_BUCKET)
+            .upload(thumbPath, variants.thumbBytes, {
+              upsert: false,
+              cacheControl: "31536000",
+              contentType: "image/webp",
+            }),
+        ]);
+
+      if (detailUploadError) {
+        throw new Error(`Supabase upload failed: ${detailUploadError.message}`);
+      }
+
+      if (thumbUploadError) {
+        throw new Error(`Supabase upload failed: ${thumbUploadError.message}`);
+      }
+
+      imageUrl = supabase.storage
+        .from(TEAM_ROLE_IMAGES_BUCKET)
+        .getPublicUrl(detailPath).data.publicUrl;
+
+      thumbnailUrl = supabase.storage
+        .from(TEAM_ROLE_IMAGES_BUCKET)
+        .getPublicUrl(thumbPath).data.publicUrl;
+    } else {
+      const fallbackStoragePath = `${storageBasePath}.${imageType.extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(TEAM_ROLE_IMAGES_BUCKET)
+        .upload(fallbackStoragePath, bytes, {
+          upsert: false,
+          cacheControl: "31536000",
+          contentType: imageType.contentType,
+        });
+
+      if (uploadError) {
+        throw new Error(`Supabase upload failed: ${uploadError.message}`);
+      }
+
+      imageUrl = supabase.storage
+        .from(TEAM_ROLE_IMAGES_BUCKET)
+        .getPublicUrl(fallbackStoragePath).data.publicUrl;
     }
-
-    const imageUrl = supabase.storage
-      .from(TEAM_ROLE_IMAGES_BUCKET)
-      .getPublicUrl(storagePath).data.publicUrl;
 
     if (!imageUrl) {
       throw new Error("Failed to generate public URL");
@@ -152,6 +197,7 @@ export async function POST(
       data: {
         role: parsedRole.data,
         imageUrl,
+        thumbnailUrl,
       },
     });
   } catch (error) {

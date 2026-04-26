@@ -40,6 +40,7 @@ export function Attribution() {
       rel="noopener noreferrer"
       style={{ zIndex: 9999 }}
       className={`fixed ${positionClass} flex items-center gap-2 text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-white/40 transition-colors hover:text-white drop-shadow-md pointer-events-auto`}
+      suppressHydrationWarning
     >
       <span className="flex items-center gap-1.5 whitespace-nowrap">
         <span>Made with</span>

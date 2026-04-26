@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { toDisplayImageUrl } from "@/lib/imageUrl";
+import { toDisplayVariantImageUrl } from "@/lib/imageUrl";
 import type { Player } from "@/types";
 
 const MAX_PLAYER_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -140,7 +140,10 @@ export function AdminPlayersBlock() {
   });
 
   const players: Player[] = data?.data || [];
-  const selectedPlayerImageUrl = toDisplayImageUrl(formState.imageUrl);
+  const selectedPlayerImageUrl = toDisplayVariantImageUrl(
+    formState.imageUrl,
+    "detail",
+  );
 
   const filteredPlayers = players.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()),
@@ -311,7 +314,10 @@ export function AdminPlayersBlock() {
           </div>
         ) : (
           filteredPlayers.map((player) => {
-            const playerImageUrl = toDisplayImageUrl(player.imageUrl);
+            const playerImageUrl = toDisplayVariantImageUrl(
+              player.imageUrl,
+              "thumb",
+            );
 
             return (
               <button

@@ -8,7 +8,7 @@ import type { Player } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTeam } from "@/hooks/useAuction";
 import { ROUTES, TEAM_COLORS } from "@/lib/constants";
-import { toDisplayImageUrl } from "@/lib/imageUrl";
+import { toDisplayVariantImageUrl } from "@/lib/imageUrl";
 import type { TeamRoleSlot } from "@/types";
 import { ErrorState } from "../shared/ErrorState";
 import { LoadingState } from "../shared/LoadingState";
@@ -253,16 +253,23 @@ function RoleProfileCard({
 }) {
   const hasContent = hasRoleContent(profile);
   const [isOpen, setIsOpen] = useState(false);
-  const profileImageUrl = toDisplayImageUrl(profile?.imageUrl);
+  const profileThumbImageUrl = toDisplayVariantImageUrl(
+    profile?.imageUrl,
+    "thumb",
+  );
+  const profileDetailImageUrl = toDisplayVariantImageUrl(
+    profile?.imageUrl,
+    "detail",
+  );
   const layoutIdBase = `role-${teamId}-${label.replace(/\s+/g, "-")}-${profile?.name?.replace(/\s+/g, "-") ?? "empty"}`;
 
   return (
     <>
       <motion.div
         layoutId={`${layoutIdBase}-card`}
-        onClick={() => profileImageUrl && setIsOpen(true)}
+          onClick={() => profileDetailImageUrl && setIsOpen(true)}
         className={`relative overflow-hidden rounded-2xl border border-slate-800/80 bg-pitch-950/40 p-5 shadow-lg group ${
-          profileImageUrl
+            profileDetailImageUrl
             ? "cursor-pointer hover:bg-slate-800/40 hover:border-slate-700 hover:-translate-y-1 transition-all duration-300"
             : ""
         }`}
@@ -276,12 +283,12 @@ function RoleProfileCard({
 
         {hasContent ? (
           <div className="mt-4 min-h-[4.5rem] flex items-center gap-4">
-            {profileImageUrl ? (
+            {profileThumbImageUrl ? (
               <div className="relative size-16 shrink-0">
                 <div className="absolute inset-0 bg-accent-gold/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
                 <motion.img
                   layoutId={`${layoutIdBase}-image`}
-                  src={profileImageUrl}
+                  src={profileThumbImageUrl}
                   alt={profile?.name || label}
                   className="relative size-16 rounded-full object-cover border-2 border-slate-700 bg-slate-800 z-10 shadow-xl"
                 />
@@ -313,7 +320,7 @@ function RoleProfileCard({
       </motion.div>
 
       <AnimatePresence>
-        {isOpen && profileImageUrl && (
+        {isOpen && profileDetailImageUrl && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
             <motion.div
               initial={{ opacity: 0 }}
@@ -337,7 +344,7 @@ function RoleProfileCard({
                 <div className="absolute inset-0 bg-gradient-to-t from-pitch-950 via-transparent to-transparent z-10 pointer-events-none" />
                 <motion.img
                   layoutId={`${layoutIdBase}-image`}
-                  src={profileImageUrl}
+                  src={profileDetailImageUrl}
                   alt={profile?.name || label}
                   className="h-full w-full object-cover"
                 />

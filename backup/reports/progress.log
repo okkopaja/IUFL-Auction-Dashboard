@@ -1,0 +1,6 @@
+[2026-04-24T21:05:47Z] Phase A: Preflight started
+[2026-04-24T21:05:47Z] Phase A.1 Tooling check passed (psql/pg_dump available)
+[2026-04-24T21:05:47Z] Phase A.2 Source connectivity failed
+[2026-04-24T21:05:48Z] Phase A.3 Target connectivity passed
+[2026-04-24T21:05:48Z] Phase A.4 Artifact directories ready
+[2026-04-24T21:05:48Z] Prechecks failed. Stopping before destructive phases.

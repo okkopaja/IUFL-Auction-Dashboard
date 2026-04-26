@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { classifyImageUrl } from "@/features/player-import/driveImage";
 import { resolveImageType } from "@/lib/imageType";
+import {
+  buildVariantStoragePaths,
+  createWebpVariants,
+  shouldGenerateWebpVariants,
+} from "@/lib/imageVariants";
 import type { getSupabaseAdminClient } from "@/lib/supabase";
 import type { TeamRole } from "@/types";
 
@@ -153,23 +158,69 @@ export async function uploadRoleImagesFromUrls(
       }
 
       const storageBasePath = buildStoragePath(row, source.hashSourceUrl);
-      const storagePath = `${storageBasePath}.${resolvedType.extension}`;
+      const shouldCreateVariants = shouldGenerateWebpVariants(resolvedType);
+      const variants = shouldCreateVariants
+        ? await createWebpVariants(bytes)
+        : null;
 
-      const { error: uploadError } = await supabase.storage
-        .from(ICON_IMAGES_BUCKET)
-        .upload(storagePath, bytes, {
-          upsert: true,
-          contentType: resolvedType.contentType,
-          cacheControl: "31536000",
-        });
+      let publicUrl: string | null = null;
 
-      if (uploadError) {
-        throw new Error(`Supabase upload failed: ${uploadError.message}`);
+      if (variants) {
+        const { detailPath, thumbPath } =
+          buildVariantStoragePaths(storageBasePath);
+
+        const [{ error: detailUploadError }, { error: thumbUploadError }] =
+          await Promise.all([
+            supabase.storage
+              .from(ICON_IMAGES_BUCKET)
+              .upload(detailPath, variants.detailBytes, {
+                upsert: true,
+                contentType: "image/webp",
+                cacheControl: "31536000",
+              }),
+            supabase.storage
+              .from(ICON_IMAGES_BUCKET)
+              .upload(thumbPath, variants.thumbBytes, {
+                upsert: true,
+                contentType: "image/webp",
+                cacheControl: "31536000",
+              }),
+          ]);
+
+        if (detailUploadError) {
+          throw new Error(
+            `Supabase upload failed: ${detailUploadError.message}`,
+          );
+        }
+
+        if (thumbUploadError) {
+          throw new Error(
+            `Supabase upload failed: ${thumbUploadError.message}`,
+          );
+        }
+
+        publicUrl = supabase.storage
+          .from(ICON_IMAGES_BUCKET)
+          .getPublicUrl(detailPath).data.publicUrl;
+      } else {
+        const fallbackStoragePath = `${storageBasePath}.${resolvedType.extension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(ICON_IMAGES_BUCKET)
+          .upload(fallbackStoragePath, bytes, {
+            upsert: true,
+            contentType: resolvedType.contentType,
+            cacheControl: "31536000",
+          });
+
+        if (uploadError) {
+          throw new Error(`Supabase upload failed: ${uploadError.message}`);
+        }
+
+        publicUrl = supabase.storage
+          .from(ICON_IMAGES_BUCKET)
+          .getPublicUrl(fallbackStoragePath).data.publicUrl;
       }
-
-      const publicUrl = supabase.storage
-        .from(ICON_IMAGES_BUCKET)
-        .getPublicUrl(storagePath).data.publicUrl;
 
       if (!publicUrl) {
         throw new Error("Failed to generate public URL");

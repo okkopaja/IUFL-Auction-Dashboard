@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { resolveImageType } from "@/lib/imageType";
+import {
+  buildVariantStoragePaths,
+  createWebpVariants,
+  shouldGenerateWebpVariants,
+} from "@/lib/imageVariants";
 import { logger } from "@/lib/logger";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
@@ -9,11 +14,7 @@ const PLAYER_IMAGE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const PLAYER_IMAGES_BUCKET =
   process.env.PLAYER_IMAGES_BUCKET?.trim() || "player-images";
 
-function buildStoragePath(
-  sessionId: string,
-  playerId: string,
-  extension: string,
-): string {
+function buildStoragePath(sessionId: string, playerId: string): string {
   const now = new Date();
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const day = String(now.getUTCDate()).padStart(2, "0");
@@ -26,7 +27,7 @@ function buildStoragePath(
     String(now.getUTCFullYear()),
     month,
     day,
-    `${randomUUID()}.${extension}`,
+    randomUUID(),
   ].join("/");
 }
 
@@ -100,27 +101,71 @@ export async function POST(
       );
     }
 
-    const storagePath = buildStoragePath(
-      player.sessionId,
-      player.id,
-      imageType.extension,
-    );
+    const storageBasePath = buildStoragePath(player.sessionId, player.id);
+    const shouldCreateVariants = shouldGenerateWebpVariants(imageType);
+    const variants = shouldCreateVariants
+      ? await createWebpVariants(bytes)
+      : null;
 
-    const { error: uploadError } = await supabase.storage
-      .from(PLAYER_IMAGES_BUCKET)
-      .upload(storagePath, bytes, {
-        upsert: false,
-        cacheControl: "31536000",
-        contentType: imageType.contentType,
-      });
+    let imageUrl: string | null = null;
+    let thumbnailUrl: string | null = null;
 
-    if (uploadError) {
-      throw new Error(`Supabase upload failed: ${uploadError.message}`);
+    if (variants) {
+      const { detailPath, thumbPath } =
+        buildVariantStoragePaths(storageBasePath);
+
+      const [{ error: detailUploadError }, { error: thumbUploadError }] =
+        await Promise.all([
+          supabase.storage
+            .from(PLAYER_IMAGES_BUCKET)
+            .upload(detailPath, variants.detailBytes, {
+              upsert: false,
+              cacheControl: "31536000",
+              contentType: "image/webp",
+            }),
+          supabase.storage
+            .from(PLAYER_IMAGES_BUCKET)
+            .upload(thumbPath, variants.thumbBytes, {
+              upsert: false,
+              cacheControl: "31536000",
+              contentType: "image/webp",
+            }),
+        ]);
+
+      if (detailUploadError) {
+        throw new Error(`Supabase upload failed: ${detailUploadError.message}`);
+      }
+
+      if (thumbUploadError) {
+        throw new Error(`Supabase upload failed: ${thumbUploadError.message}`);
+      }
+
+      imageUrl = supabase.storage
+        .from(PLAYER_IMAGES_BUCKET)
+        .getPublicUrl(detailPath).data.publicUrl;
+
+      thumbnailUrl = supabase.storage
+        .from(PLAYER_IMAGES_BUCKET)
+        .getPublicUrl(thumbPath).data.publicUrl;
+    } else {
+      const fallbackStoragePath = `${storageBasePath}.${imageType.extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(PLAYER_IMAGES_BUCKET)
+        .upload(fallbackStoragePath, bytes, {
+          upsert: false,
+          cacheControl: "31536000",
+          contentType: imageType.contentType,
+        });
+
+      if (uploadError) {
+        throw new Error(`Supabase upload failed: ${uploadError.message}`);
+      }
+
+      imageUrl = supabase.storage
+        .from(PLAYER_IMAGES_BUCKET)
+        .getPublicUrl(fallbackStoragePath).data.publicUrl;
     }
-
-    const imageUrl = supabase.storage
-      .from(PLAYER_IMAGES_BUCKET)
-      .getPublicUrl(storagePath).data.publicUrl;
 
     if (!imageUrl) {
       throw new Error("Failed to generate public URL");
@@ -130,6 +175,7 @@ export async function POST(
       success: true,
       data: {
         imageUrl,
+        thumbnailUrl,
       },
     });
   } catch (error) {

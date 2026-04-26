@@ -6,7 +6,7 @@ import { type ChangeEvent, type UIEvent, memo, useMemo, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { usePlayers } from "@/hooks/useAuction";
 import { ROUTES } from "@/lib/constants";
-import { toDisplayImageUrl } from "@/lib/imageUrl";
+import { toDisplayVariantImageUrl } from "@/lib/imageUrl";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types";
 import { LoadingState } from "../shared/LoadingState";
@@ -45,7 +45,7 @@ export const PlayerRowItem = memo(function PlayerRowItem({
     POSITION_COLORS[pos1?.toUpperCase()] ??
     "text-slate-400 bg-slate-400/10 border-slate-400/30";
   const soldStatus = isSoldStatus(player, status);
-  const playerImageUrl = toDisplayImageUrl(player.imageUrl);
+  const playerImageUrl = toDisplayVariantImageUrl(player.imageUrl, "thumb");
 
   const rowContent = (
     <div
@@ -166,7 +166,7 @@ export function PlayerDetailsDialog({
     : null;
 
   const soldStatus = isSoldStatus(player, status);
-  const playerImageUrl = toDisplayImageUrl(player.imageUrl);
+  const playerImageUrl = toDisplayVariantImageUrl(player.imageUrl, "detail");
 
   return (
     <Dialog open={!!player} onOpenChange={onOpenChange}>

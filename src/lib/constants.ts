@@ -44,6 +44,7 @@ export const ROUTES = {
   PLAYERS_ATTACKER: "/v1/public/players/attacker",
   TEAMS: "/v1/public/teams",
   TEAM: (teamId: string) => `/v1/public/team/${teamId}`,
+  TEAMS_DIST: "/v1/private/teams-dist",
   PLAYERS_SOLD: "/v1/public/players/sold",
   PLAYERS_UNSOLD: "/v1/public/players/unsold",
 };

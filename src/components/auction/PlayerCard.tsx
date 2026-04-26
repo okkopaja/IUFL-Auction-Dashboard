@@ -2,7 +2,7 @@
 
 import { User } from "lucide-react";
 import { motion } from "framer-motion";
-import { toDisplayImageUrl } from "@/lib/imageUrl";
+import { toDisplayVariantImageUrl } from "@/lib/imageUrl";
 import { cn } from "@/lib/utils";
 import type { Player } from "@/types";
 
@@ -22,7 +22,7 @@ export function PlayerCard({
   isFocusMode?: boolean;
 }) {
   if (!player) return null;
-  const playerImageUrl = toDisplayImageUrl(player.imageUrl);
+  const playerImageUrl = toDisplayVariantImageUrl(player.imageUrl, "detail");
 
   const pos1 = player.position1;
   const pos2 = player.position2;
