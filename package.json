@@ -9,6 +9,7 @@
     "dev": "next dev -p 3000",
     "dev:api": "tsx watch server/index.ts",
     "build:web": "next build",
+    "vercel-build": "npm run td:generate && next build",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
