@@ -87,10 +87,26 @@ export async function POST(
 
     const supabase = getSupabaseAdminClient();
 
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "No active auction session found" },
+        { status: 404 },
+      );
+    }
+
     const { data: player, error: playerError } = await supabase
       .from("Player")
       .select("id,sessionId")
       .eq("id", playerId)
+      .eq("sessionId", session.id)
       .maybeSingle();
 
     if (playerError) throw playerError;

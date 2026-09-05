@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { tdPrisma } from "@/lib/teams-dist/prisma";
 import { logger } from "@/lib/logger";
 import type { TeamCsvRow } from "@/types/teams-dist";
+import { syncTournamentTeamsToAuction } from "@/lib/teams-dist/syncAuctionTeams";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,11 @@ export async function POST(req: Request, { params }: Ctx) {
 
       return created;
     });
+
+    await syncTournamentTeamsToAuction(
+      tournamentId,
+      teams.map((team: any) => team),
+    );
 
     // biome-ignore lint/suspicious/noExplicitAny: generated runtime type
     return NextResponse.json({

@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   DrawRequest,
   DrawResult,
@@ -51,7 +47,11 @@ export function useTournament(id: string) {
 
 export function useCreateTournament() {
   const qc = useQueryClient();
-  return useMutation<TdTournament, Error, { name: string }>({
+  return useMutation<
+    TdTournament,
+    Error,
+    { name: string; numberOfGroups?: number; teamsPerGroup?: number }
+  >({
     mutationFn: (data) =>
       apiFetch(`${BASE}`, {
         method: "POST",
@@ -66,8 +66,22 @@ export function useCreateTournament() {
 export function useDeleteTournament() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: (id) =>
-      apiFetch(`${BASE}/${id}`, { method: "DELETE" }),
+    mutationFn: (id) => apiFetch(`${BASE}/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["td", "tournaments"] });
+    },
+  });
+}
+
+export function useSwitchTournament() {
+  const qc = useQueryClient();
+
+  return useMutation<
+    { tournamentId: string; auctionSessionId: string },
+    Error,
+    string
+  >({
+    mutationFn: (id) => apiFetch(`${BASE}/${id}/switch`, { method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["td", "tournaments"] });
     },

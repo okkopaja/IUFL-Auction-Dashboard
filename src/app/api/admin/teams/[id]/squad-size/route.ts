@@ -1,14 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
+import { AUCTION_FIXED_ROLE_SLOTS } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
-const updateTeamPointsPayloadSchema = z.object({
-  pointsTotal: z.coerce
+const updateTeamSquadSizePayloadSchema = z.object({
+  squadSize: z.coerce
     .number()
     .int()
-    .min(0, "Points must be a non-negative whole number"),
+    .min(
+      AUCTION_FIXED_ROLE_SLOTS + 1,
+      `Squad size must be at least ${AUCTION_FIXED_ROLE_SLOTS + 1}`,
+    )
+    .max(100, "Squad size must be 100 or less"),
 });
 
 export async function PATCH(
@@ -21,7 +26,7 @@ export async function PATCH(
   try {
     const { id: teamId } = await params;
     const body = await req.json();
-    const parseResult = updateTeamPointsPayloadSchema.safeParse(body);
+    const parseResult = updateTeamSquadSizePayloadSchema.safeParse(body);
 
     if (!parseResult.success) {
       return NextResponse.json(
@@ -34,9 +39,8 @@ export async function PATCH(
       );
     }
 
-    const { pointsTotal } = parseResult.data;
+    const { squadSize } = parseResult.data;
     const supabase = getSupabaseAdminClient();
-
     const { data: session, error: sessionError } = await supabase
       .from("AuctionSession")
       .select("id")
@@ -54,13 +58,12 @@ export async function PATCH(
 
     const { data: team, error: teamError } = await supabase
       .from("Team")
-      .select("id,pointsTotal,pointsSpent")
+      .select("id,squadSize")
       .eq("id", teamId)
       .eq("sessionId", session.id)
       .maybeSingle();
 
     if (teamError) throw teamError;
-
     if (!team) {
       return NextResponse.json(
         { success: false, error: "Team not found" },
@@ -68,38 +71,46 @@ export async function PATCH(
       );
     }
 
-    if (pointsTotal < team.pointsSpent) {
+    const { count: playersOwnedCount, error: playersError } = await supabase
+      .from("Player")
+      .select("id", { count: "exact", head: true })
+      .eq("sessionId", session.id)
+      .eq("teamId", team.id);
+
+    if (playersError) throw playersError;
+
+    const { data: roles, error: rolesError } = await supabase
+      .from("TeamRoleProfile")
+      .select("role,name,imageUrl")
+      .eq("teamId", team.id)
+      .in("role", ["CAPTAIN", "MARQUEE"]);
+
+    if (rolesError) throw rolesError;
+
+    const configuredFixedRoles = (roles ?? []).filter((role) =>
+      Boolean(role.name?.trim() || role.imageUrl?.trim()),
+    ).length;
+    const currentSquadSize = (playersOwnedCount ?? 0) + configuredFixedRoles;
+
+    if (squadSize < currentSquadSize) {
       return NextResponse.json(
         {
           success: false,
-          error: `Points total cannot be below points spent (${team.pointsSpent})`,
+          error: `Squad size cannot be below the current squad count (${currentSquadSize})`,
         },
         { status: 409 },
       );
     }
 
-    if (pointsTotal === team.pointsTotal) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          id: team.id,
-          pointsTotal: team.pointsTotal,
-          pointsSpent: team.pointsSpent,
-          pointsRemaining: team.pointsTotal - team.pointsSpent,
-        },
-      });
-    }
-
     const { data: updatedTeam, error: updateError } = await supabase
       .from("Team")
-      .update({ pointsTotal })
-      .eq("id", teamId)
+      .update({ squadSize })
+      .eq("id", team.id)
       .eq("sessionId", session.id)
-      .select("id,pointsTotal,pointsSpent")
+      .select("id,squadSize")
       .maybeSingle();
 
     if (updateError) throw updateError;
-
     if (!updatedTeam) {
       return NextResponse.json(
         { success: false, error: "Team not found" },
@@ -107,19 +118,11 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: updatedTeam.id,
-        pointsTotal: updatedTeam.pointsTotal,
-        pointsSpent: updatedTeam.pointsSpent,
-        pointsRemaining: updatedTeam.pointsTotal - updatedTeam.pointsSpent,
-      },
-    });
+    return NextResponse.json({ success: true, data: updatedTeam });
   } catch (error) {
-    logger.error("Failed to update team points", error);
+    logger.error("Failed to update team squad size", error);
     return NextResponse.json(
-      { success: false, error: "Failed to update team points" },
+      { success: false, error: "Failed to update team squad size" },
       { status: 500 },
     );
   }

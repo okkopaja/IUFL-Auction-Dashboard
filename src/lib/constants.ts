@@ -25,6 +25,10 @@ export const AUCTION_FIXED_ROLE_SLOTS = 2;
 export const AUCTION_MANDATORY_PLAYER_SLOTS =
   AUCTION_TOTAL_SQUAD_SIZE - AUCTION_FIXED_ROLE_SLOTS;
 
+export function getMandatoryAuctionPlayerSlots(squadSize: number): number {
+  return Math.max(1, Math.trunc(squadSize) - AUCTION_FIXED_ROLE_SLOTS);
+}
+
 export const ROUTES = {
   HOME: "/",
   PUBLIC: "/v1/public",

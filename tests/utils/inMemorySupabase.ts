@@ -2,6 +2,7 @@ type TableName =
   | "AuctionSession"
   | "Player"
   | "Team"
+  | "TeamRoleProfile"
   | "Transaction"
   | "AuctionActionHistory";
 
@@ -11,6 +12,7 @@ type DatabaseState = {
   AuctionSession: GenericRow[];
   Player: GenericRow[];
   Team: GenericRow[];
+  TeamRoleProfile: GenericRow[];
   Transaction: GenericRow[];
   AuctionActionHistory: GenericRow[];
 };
@@ -39,6 +41,7 @@ function createDefaultState(): DatabaseState {
     AuctionSession: [],
     Player: [],
     Team: [],
+    TeamRoleProfile: [],
     Transaction: [],
     AuctionActionHistory: [],
   };
@@ -397,6 +400,7 @@ export function createInMemorySupabase(
     AuctionSession: cloneRow(initialState?.AuctionSession ?? []),
     Player: cloneRow(initialState?.Player ?? []),
     Team: cloneRow(initialState?.Team ?? []),
+    TeamRoleProfile: cloneRow(initialState?.TeamRoleProfile ?? []),
     Transaction: cloneRow(initialState?.Transaction ?? []),
     AuctionActionHistory: cloneRow(initialState?.AuctionActionHistory ?? []),
   };
@@ -454,6 +458,7 @@ export function buildTeam(overrides?: Partial<GenericRow>) {
     name: "Test Team",
     shortCode: "TST",
     domain: "example.com",
+    squadSize: 16,
     pointsTotal: 1000,
     pointsSpent: 0,
     sessionId: "session-1",

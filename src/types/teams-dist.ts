@@ -20,6 +20,9 @@ export interface TdTournament {
   name: string;
   formatType: string;
   totalTeams: number;
+  numberOfGroups: number;
+  teamsPerGroup: number;
+  auctionSessionId: string | null;
   status: TournamentStatus;
   createdBy: string | null;
   createdAt: string;
@@ -27,6 +30,7 @@ export interface TdTournament {
   /** Extra counts joined by the API */
   teamCount?: number;
   assignedCount?: number;
+  isActive?: boolean;
 }
 
 export interface TdTeam {

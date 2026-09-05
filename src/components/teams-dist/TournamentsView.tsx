@@ -3,8 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trophy, Users, Shuffle, ArrowRight, Trash2, Loader2 } from "lucide-react";
-import { useCreateTournament, useDeleteTournament, useTournaments } from "@/hooks/useTeamsDist";
+import {
+  Plus,
+  Trophy,
+  Users,
+  Shuffle,
+  ArrowRight,
+  Trash2,
+  Loader2,
+} from "lucide-react";
+import {
+  useCreateTournament,
+  useDeleteTournament,
+  useTournaments,
+} from "@/hooks/useTeamsDist";
 import type { TdTournament } from "@/types/teams-dist";
 import { toast } from "sonner";
 import { ROUTES } from "@/lib/constants";
@@ -48,7 +60,9 @@ function TournamentCard({
             <Trophy className="size-5 text-violet-400" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-100 leading-tight">{tournament.name}</h3>
+            <h3 className="font-semibold text-slate-100 leading-tight">
+              {tournament.name}
+            </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               {new Date(tournament.createdAt).toLocaleDateString()}
             </p>
@@ -64,7 +78,7 @@ function TournamentCard({
       <div className="flex items-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1.5">
           <Users className="size-3.5" />
-          {tournament.teamCount ?? 0} / 16 teams
+          {tournament.teamCount ?? 0} / {tournament.totalTeams} teams
         </span>
         <span className="flex items-center gap-1.5">
           <Shuffle className="size-3.5" />
@@ -99,10 +113,47 @@ function CreateTournamentModal({
   isPending,
 }: {
   onClose: () => void;
-  onCreate: (name: string) => void;
+  onCreate: (data: {
+    name: string;
+    numberOfGroups: number;
+    teamsPerGroup: number;
+  }) => void;
   isPending: boolean;
 }) {
   const [name, setName] = useState("");
+  const [numberOfGroups, setNumberOfGroups] = useState(4);
+  const [teamsPerGroup, setTeamsPerGroup] = useState(4);
+  const [error, setError] = useState<string | null>(null);
+
+  const totalTeams = numberOfGroups * teamsPerGroup;
+  const isValid = name.trim() && totalTeams > 0 && totalTeams <= 64;
+
+  function handleSubmit() {
+    if (!isValid) return;
+
+    if (numberOfGroups < 1 || numberOfGroups > 16) {
+      setError("Number of groups must be between 1 and 16");
+      return;
+    }
+
+    if (teamsPerGroup < 1 || teamsPerGroup > 16) {
+      setError("Teams per group must be between 1 and 16");
+      return;
+    }
+
+    if (totalTeams > 64) {
+      setError("Total teams cannot exceed 64");
+      return;
+    }
+
+    setError(null);
+    onCreate({ name: name.trim(), numberOfGroups, teamsPerGroup });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && isValid) handleSubmit();
+    if (e.key === "Escape") onClose();
+  }
 
   return (
     <motion.div
@@ -120,24 +171,94 @@ function CreateTournamentModal({
         className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-[#0d1218] p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold text-slate-100 mb-1">New Tournament</h2>
+        <h2 className="text-lg font-bold text-slate-100 mb-1">
+          New Tournament
+        </h2>
         <p className="text-sm text-slate-500 mb-5">
-          Create a 16-team, 4-group tournament.
+          Configure your tournament with custom group and team settings.
         </p>
 
-        <input
-          autoFocus
-          type="text"
-          placeholder="Tournament name…"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) onCreate(name.trim());
-            if (e.key === "Escape") onClose();
-          }}
-          className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-violet-500 transition-colors mb-4"
-        />
+        {/* Tournament name */}
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+            Tournament Name
+          </label>
+          <input
+            autoFocus
+            type="text"
+            placeholder="e.g., UEFA Champions League 2026"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-600 outline-none focus:border-violet-500 transition-colors"
+          />
+        </div>
 
+        {/* Number of groups */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+              Groups
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="16"
+              value={numberOfGroups}
+              onChange={(e) =>
+                setNumberOfGroups(
+                  Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 1)),
+                )
+              }
+              onKeyDown={handleKeyDown}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-violet-500 transition-colors"
+            />
+            <p className="text-xs text-slate-600 mt-1">1–16 groups</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">
+              Teams/Group
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="16"
+              value={teamsPerGroup}
+              onChange={(e) =>
+                setTeamsPerGroup(
+                  Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 1)),
+                )
+              }
+              onKeyDown={handleKeyDown}
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-violet-500 transition-colors"
+            />
+            <p className="text-xs text-slate-600 mt-1">1–16 teams</p>
+          </div>
+        </div>
+
+        {/* Total teams display */}
+        <div className="mb-4 p-3 rounded-lg border border-violet-800/40 bg-violet-900/20">
+          <p className="text-xs text-slate-400 mb-1">Total Teams</p>
+          <p className="text-lg font-bold text-violet-300">
+            {numberOfGroups} × {teamsPerGroup} ={" "}
+            <span className="text-xl">{totalTeams}</span>
+          </p>
+          {totalTeams > 64 && (
+            <p className="text-xs text-red-400 mt-2">
+              ⚠ Exceeds maximum of 64 teams
+            </p>
+          )}
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg border border-red-800/40 bg-red-900/20 text-xs text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Action buttons */}
         <div className="flex gap-3">
           <button
             type="button"
@@ -148,8 +269,8 @@ function CreateTournamentModal({
           </button>
           <button
             type="button"
-            disabled={!name.trim() || isPending}
-            onClick={() => onCreate(name.trim())}
+            disabled={!isValid || isPending}
+            onClick={handleSubmit}
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isPending ? (
@@ -171,17 +292,18 @@ export function TournamentsView() {
   const deleteMutation = useDeleteTournament();
   const [showCreate, setShowCreate] = useState(false);
 
-  function handleCreate(name: string) {
-    createMutation.mutate(
-      { name },
-      {
-        onSuccess: () => {
-          setShowCreate(false);
-          toast.success(`Tournament "${name}" created`);
-        },
-        onError: (err) => toast.error(err.message),
-      }
-    );
+  function handleCreate(data: {
+    name: string;
+    numberOfGroups: number;
+    teamsPerGroup: number;
+  }) {
+    createMutation.mutate(data, {
+      onSuccess: () => {
+        setShowCreate(false);
+        toast.success(`Tournament "${data.name}" created`);
+      },
+      onError: (err) => toast.error(err.message),
+    });
   }
 
   function handleDelete(id: string) {
@@ -200,7 +322,10 @@ export function TournamentsView() {
       <header className="sticky top-0 z-10 border-b border-slate-800/80 bg-neutral-950/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
-            <Link href="/" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            <Link
+              href="/"
+              className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+            >
               ← Home
             </Link>
             <span className="text-slate-700">/</span>
@@ -269,7 +394,11 @@ export function TournamentsView() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <AnimatePresence mode="popLayout">
               {tournaments.map((t) => (
-                <TournamentCard key={t.id} tournament={t} onDelete={handleDelete} />
+                <TournamentCard
+                  key={t.id}
+                  tournament={t}
+                  onDelete={handleDelete}
+                />
               ))}
             </AnimatePresence>
           </div>

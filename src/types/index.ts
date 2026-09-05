@@ -59,6 +59,7 @@ export interface Team {
   name: string;
   shortCode: string;
   domain: string;
+  squadSize: number;
   pointsTotal: number;
   pointsSpent: number;
   pointsRemaining: number;

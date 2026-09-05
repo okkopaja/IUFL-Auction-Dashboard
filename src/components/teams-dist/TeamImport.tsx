@@ -3,7 +3,14 @@
 import { useRef, useState } from "react";
 import Papa from "papaparse";
 import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, X, CheckCircle2, AlertCircle, Loader2, Plus } from "lucide-react";
+import {
+  UploadCloud,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Plus,
+} from "lucide-react";
 import { useAddTeam, useImportTeams } from "@/hooks/useTeamsDist";
 import type { TeamCsvRow, TdTeam } from "@/types/teams-dist";
 import { toast } from "sonner";
@@ -12,9 +19,11 @@ import { toast } from "sonner";
 
 function CsvUpload({
   tournamentId,
+  expectedTeams,
   onSuccess,
 }: {
   tournamentId: string;
+  expectedTeams: number;
   onSuccess: () => void;
 }) {
   const [preview, setPreview] = useState<TeamCsvRow[] | null>(null);
@@ -29,8 +38,8 @@ function CsvUpload({
       skipEmptyLines: true,
       complete: (result) => {
         const rows = result.data;
-        if (rows.length !== 16) {
-          setParseError(`Expected 16 rows, found ${rows.length}`);
+        if (rows.length !== expectedTeams) {
+          setParseError(`Expected ${expectedTeams} rows, found ${rows.length}`);
           setPreview(null);
           return;
         }
@@ -42,7 +51,7 @@ function CsvUpload({
           return;
         }
         const uniq = new Set(names.map((n) => n.toLowerCase()));
-        if (uniq.size !== 16) {
+        if (uniq.size !== expectedTeams) {
           setParseError("Duplicate team names found");
           setPreview(null);
           return;
@@ -63,7 +72,7 @@ function CsvUpload({
     if (!preview) return;
     importMutation.mutate(preview, {
       onSuccess: () => {
-        toast.success("16 teams imported successfully");
+        toast.success(`${expectedTeams} teams imported successfully`);
         setPreview(null);
         onSuccess();
       },
@@ -151,12 +160,25 @@ function CsvUpload({
                 <tbody>
                   {preview.map((row, i) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: preview rows
-                    <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-900/30">
-                      <td className="px-3 py-2 font-mono text-slate-600">{i + 1}</td>
-                      <td className="px-3 py-2 font-medium text-slate-200">{row.team_name}</td>
-                      <td className="px-3 py-2 text-slate-500">{row.short_name ?? "—"}</td>
-                      <td className="px-3 py-2 text-slate-500">{row.country ?? "—"}</td>
-                      <td className="px-3 py-2 text-slate-500">{row.seed_pot ?? "—"}</td>
+                    <tr
+                      key={i}
+                      className="border-b border-slate-800/50 hover:bg-slate-900/30"
+                    >
+                      <td className="px-3 py-2 font-mono text-slate-600">
+                        {i + 1}
+                      </td>
+                      <td className="px-3 py-2 font-medium text-slate-200">
+                        {row.team_name}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {row.short_name ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {row.country ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500">
+                        {row.seed_pot ?? "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -174,7 +196,9 @@ function CsvUpload({
               ) : (
                 <CheckCircle2 className="size-4" />
               )}
-              {importMutation.isPending ? "Importing…" : "Commit 16 Teams"}
+              {importMutation.isPending
+                ? "Importing…"
+                : `Commit ${expectedTeams} Teams`}
             </button>
           </motion.div>
         )}
@@ -188,9 +212,11 @@ function CsvUpload({
 function ManualAddForm({
   tournamentId,
   teamCount,
+  maxTeams,
 }: {
   tournamentId: string;
   teamCount: number;
+  maxTeams: number;
 }) {
   const [name, setName] = useState("");
   const [country, setCountry] = useState("");
@@ -208,11 +234,11 @@ function ManualAddForm({
           setCountry("");
         },
         onError: (err) => toast.error(err.message),
-      }
+      },
     );
   }
 
-  const atMax = teamCount >= 16;
+  const atMax = teamCount >= maxTeams;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -244,7 +270,7 @@ function ManualAddForm({
         ) : (
           <Plus className="size-4" />
         )}
-        {atMax ? "16 / 16 — Maximum reached" : "Add Team"}
+        {atMax ? `${maxTeams} / ${maxTeams} — Maximum reached` : "Add Team"}
       </button>
     </form>
   );
@@ -267,7 +293,10 @@ function TeamList({ teams }: { teams: TdTeam[] }) {
         <thead className="sticky top-0 border-b border-slate-800 bg-slate-900">
           <tr>
             {["#", "Name", "Country", "Group"].map((h) => (
-              <th key={h} className="px-3 py-2 text-left font-semibold text-slate-500">
+              <th
+                key={h}
+                className="px-3 py-2 text-left font-semibold text-slate-500"
+              >
                 {h}
               </th>
             ))}
@@ -275,10 +304,17 @@ function TeamList({ teams }: { teams: TdTeam[] }) {
         </thead>
         <tbody>
           {teams.map((team, i) => (
-            <tr key={team.id} className="border-b border-slate-800/50 hover:bg-slate-900/30">
+            <tr
+              key={team.id}
+              className="border-b border-slate-800/50 hover:bg-slate-900/30"
+            >
               <td className="px-3 py-2 font-mono text-slate-600">{i + 1}</td>
-              <td className="px-3 py-2 font-medium text-slate-200">{team.name}</td>
-              <td className="px-3 py-2 text-slate-500">{team.country ?? "—"}</td>
+              <td className="px-3 py-2 font-medium text-slate-200">
+                {team.name}
+              </td>
+              <td className="px-3 py-2 text-slate-500">
+                {team.country ?? "—"}
+              </td>
               <td className="px-3 py-2">
                 {team.groupAssignment ? (
                   <span className="rounded-full bg-violet-900/50 px-2 py-0.5 text-violet-300 font-semibold">
@@ -301,10 +337,12 @@ function TeamList({ teams }: { teams: TdTeam[] }) {
 export function TeamImport({
   tournamentId,
   teams,
+  totalTeams,
   onImported,
 }: {
   tournamentId: string;
   teams: TdTeam[];
+  totalTeams: number;
   onImported: () => void;
 }) {
   const [mode, setMode] = useState<"csv" | "manual">("csv");
@@ -338,15 +376,23 @@ export function TeamImport({
       )}
 
       {mode === "csv" ? (
-        <CsvUpload tournamentId={tournamentId} onSuccess={onImported} />
+        <CsvUpload
+          tournamentId={tournamentId}
+          expectedTeams={totalTeams}
+          onSuccess={onImported}
+        />
       ) : (
-        <ManualAddForm tournamentId={tournamentId} teamCount={teams.length} />
+        <ManualAddForm
+          tournamentId={tournamentId}
+          teamCount={teams.length}
+          maxTeams={totalTeams}
+        />
       )}
 
       {teams.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
-            Current Teams ({teams.length} / 16)
+            Current Teams ({teams.length} / {totalTeams})
           </p>
           <TeamList teams={teams} />
         </div>

@@ -32,6 +32,7 @@ export interface WatchgodTeamRow {
   pointsSpent: number;
   pointsRemaining: number;
   playersOwnedCount: number;
+  squadSize: number;
   maxBid: number;
   canAffordMinimumBid: boolean;
 }
@@ -73,6 +74,7 @@ export interface WatcherTeamSnapshot {
   pointsSpent: number;
   pointsRemaining: number;
   playersOwnedCount: number;
+  squadSize: number;
   maxBid: number;
   canAffordMinimumBid: boolean;
 }

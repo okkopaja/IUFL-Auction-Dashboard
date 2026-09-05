@@ -6,7 +6,7 @@ import {
   getBidValidationError,
 } from "@/lib/bidConstraints";
 import {
-  AUCTION_MANDATORY_PLAYER_SLOTS,
+  getMandatoryAuctionPlayerSlots,
   PLAYER_BASE_PRICE,
 } from "@/lib/constants";
 import { logger } from "@/lib/logger";
@@ -77,7 +77,7 @@ export async function POST(
 
     const { data: team, error: teamError } = await supabase
       .from("Team")
-      .select("id,sessionId,pointsTotal,pointsSpent")
+      .select("id,sessionId,pointsTotal,pointsSpent,squadSize")
       .eq("id", teamId)
       .eq("sessionId", sessionId)
       .maybeSingle();
@@ -130,7 +130,7 @@ export async function POST(
     const constraints = calculateTeamBidConstraints({
       pointsRemaining,
       playersOwnedCount: playersOwnedCount ?? 0,
-      mandatoryAuctionSlots: AUCTION_MANDATORY_PLAYER_SLOTS,
+      mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(team.squadSize),
       basePrice: PLAYER_BASE_PRICE,
     });
 

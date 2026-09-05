@@ -225,54 +225,42 @@ export async function executeBatchDraw(
     getEligibleGroups(tournamentId),
   ]);
 
-  if (unassigned.length < 4) {
+  if (unassigned.length === 0) {
     await setSpinState(tournamentId, false);
-    throw new DrawEngineError(
-      `Need at least 4 unassigned teams for a batch draw (have ${unassigned.length}).`
-    );
+    throw new DrawEngineError("No unassigned teams remaining.");
   }
-  if (eligible.length < 4) {
+  if (eligible.length === 0) {
     await setSpinState(tournamentId, false);
-    throw new DrawEngineError(
-      `Need at least 4 eligible groups for a batch draw (have ${eligible.length}).`
-    );
+    throw new DrawEngineError("All groups are full.");
   }
 
-  // First, try to pull up to 4 staged assignments (single mode is ignored here)
-  const stagedRows = await tdPrisma.tdWatchdogStage.findMany({
+  // Consume exactly ONE staged entry per draw call (if any exist for BATCH mode).
+  // This ensures staged preselections are assigned one-at-a-time across draws,
+  // rather than all at once in a single batch action.
+  const staged = await tdPrisma.tdWatchdogStage.findFirst({
     where: { tournamentId, drawMode: "BATCH" },
-    take: 4,
   });
 
-  let pairs: { team: any; group: GroupName }[] = [];
-  if (stagedRows.length === 4) {
-    // Consume staged rows
-    await tdPrisma.tdWatchdogStage.deleteMany({
-      where: { id: { in: stagedRows.map((r: { id: string }) => r.id) } },
+  let team: any;
+  let group: GroupName;
+
+  if (staged) {
+    // Consume only this one staged entry
+    await tdPrisma.tdWatchdogStage.delete({ where: { id: staged.id } });
+    const foundTeam = await tdPrisma.tdTeam.findFirst({
+      where: { id: staged.teamId, tournamentId },
     });
-    for (const row of stagedRows) {
-      const team = await tdPrisma.tdTeam.findFirst({
-        where: { id: row.teamId, tournamentId },
-      });
-      if (!team) throw new DrawEngineError("Staged team not found.");
-      pairs.push({ team, group: row.groupName as GroupName });
-    }
+    if (!foundTeam) throw new DrawEngineError("Staged team not found.");
+    team = foundTeam;
+    group = staged.groupName as GroupName;
   } else {
-    // Random fallback
-    const shuffledTeams = shuffle([...unassigned]).slice(0, 4);
-    const shuffledGroups = shuffle([...eligible]).slice(0, 4) as GroupName[];
-    pairs = shuffledTeams.map((team, i) => ({ team, group: shuffledGroups[i] }));
+    // Random fallback: pick 1 team and 1 group
+    team = unassigned[secureRandInt(unassigned.length)];
+    group = eligible[secureRandInt(eligible.length)] as GroupName;
   }
 
-  const payload = pairs.map((p) => ({
-    teamId: p.team.id,
-    teamName: p.team.name,
-    group: p.group,
-  }));
-
-  // Pre‑compute slot indexes for each group
-  const counts = await getGroupSlotCounts(tournamentId);
-  const slotCounters: Record<string, number> = { ...counts };
+  const slotIndex = await getNextSlotIndex(tournamentId, group);
+  const payload = [{ teamId: team.id, teamName: team.name, group }];
 
   const action = await tdPrisma.$transaction(async (tx: any) => {
     await tx.tdDrawAction.updateMany({
@@ -290,21 +278,16 @@ export async function executeBatchDraw(
       },
     });
 
-    for (const { team, group } of pairs) {
-      const slotIndex = slotCounters[group] ?? 0;
-      slotCounters[group] = slotIndex + 1;
-
-      await tx.tdGroupAssignment.create({
-        data: {
-          tournamentId,
-          teamId: team.id,
-          groupName: group,
-          slotIndex,
-          drawMode: "BATCH",
-          actionId: newAction.id,
-        },
-      });
-    }
+    await tx.tdGroupAssignment.create({
+      data: {
+        tournamentId,
+        teamId: team.id,
+        groupName: group,
+        slotIndex,
+        drawMode: "BATCH",
+        actionId: newAction.id,
+      },
+    });
 
     await tx.tournament.update({
       where: { id: tournamentId },
@@ -314,33 +297,25 @@ export async function executeBatchDraw(
     return newAction;
   });
 
-  // Reset spin state after batch completes
+  // Reset spin state after this single assignment completes
   await setSpinState(tournamentId, false);
 
-  const remaining = unassigned.length - 4;
-  if (remaining <= 0) {
+  const remaining = unassigned.length - 1;
+  if (remaining === 0) {
     await tdPrisma.tournament.update({
       where: { id: tournamentId },
       data: { status: "DRAW_COMPLETE" },
     });
   }
 
-  const assignedTeams = await tdPrisma.tdTeam.findMany({
-    where: { id: { in: pairs.map((p) => p.team.id) } },
+  const teamWithAssignment = await tdPrisma.tdTeam.findUniqueOrThrow({
+    where: { id: team.id },
     include: { groupAssignment: true },
   });
 
-  const assignments = pairs.map((p) => ({
-    team: serializeTeam(
-      // biome-ignore lint/suspicious/noExplicitAny: generated runtime type
-      assignedTeams.find((t: any) => t.id === p.team.id)!
-    ),
-    group: p.group,
-  }));
-
   return {
     mode: "batch",
-    assignments,
+    assignments: [{ team: serializeTeam(teamWithAssignment), group }],
     action: {
       ...action,
       createdAt: action.createdAt.toISOString(),

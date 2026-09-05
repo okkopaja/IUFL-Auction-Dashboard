@@ -30,8 +30,9 @@ model AuctionSession {
 model Team {
   id               String         @id @default(cuid())
   name             String
-  shortCode        String         @unique
+  shortCode        String
   domain           String
+  squadSize        Int            @default(16)
   pointsTotal      Int            @default(1000)
   pointsSpent      Int            @default(0)
   sessionId        String
@@ -42,6 +43,7 @@ model Team {
   createdAt        DateTime       @default(now())
 
   @@index([sessionId])
+  @@unique([sessionId, shortCode])
 }
 
 model Player {

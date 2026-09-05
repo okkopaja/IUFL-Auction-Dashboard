@@ -336,6 +336,7 @@ export type Database = {
           name: string;
           pointsSpent: number;
           pointsTotal: number;
+          squadSize: number;
           sessionId: string;
           shortCode: string;
         };
@@ -346,6 +347,7 @@ export type Database = {
           name: string;
           pointsSpent?: number;
           pointsTotal?: number;
+          squadSize?: number;
           sessionId: string;
           shortCode: string;
         };
@@ -356,6 +358,7 @@ export type Database = {
           name?: string;
           pointsSpent?: number;
           pointsTotal?: number;
+          squadSize?: number;
           sessionId?: string;
           shortCode?: string;
         };

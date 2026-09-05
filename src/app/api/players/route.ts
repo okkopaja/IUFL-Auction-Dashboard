@@ -10,9 +10,20 @@ export async function GET(req: NextRequest) {
     const status = req.nextUrl.searchParams.get("status");
     const supabase = await getSupabaseServerClient();
 
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) return NextResponse.json({ success: true, data: [] });
+
     let query = supabase
       .from("Player")
-      .select("*,team:Team(id,name,shortCode)");
+      .select("*,team:Team(id,name,shortCode)")
+      .eq("sessionId", session.id);
 
     if (status) {
       query = query.eq("status", status as "UNSOLD" | "SOLD" | "IN_AUCTION");
@@ -32,7 +43,8 @@ export async function GET(req: NextRequest) {
       const { data: txData, error: txError } = await supabase
         .from("Transaction")
         .select("playerId,amount,createdAt")
-        .in("playerId", playerIds);
+        .in("playerId", playerIds)
+        .eq("sessionId", session.id);
 
       if (txError) throw txError;
       transactions = txData ?? [];

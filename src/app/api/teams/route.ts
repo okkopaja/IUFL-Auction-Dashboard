@@ -11,6 +11,16 @@ export async function GET() {
   try {
     const supabase = await getSupabaseServerClient();
 
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) return NextResponse.json({ success: true, data: [] });
+
     const { data: teamsData, error } = await supabase
       .from("Team")
       .select(`
@@ -19,6 +29,7 @@ export async function GET() {
         roleProfiles:TeamRoleProfile(*),
         transactions:Transaction(*)
       `)
+      .eq("sessionId", session.id)
       .order("name");
 
     if (error) throw error;

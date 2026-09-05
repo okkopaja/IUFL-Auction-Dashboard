@@ -70,22 +70,32 @@ async function seedTeams(sessionId: string) {
   ).length;
 
   for (const team of AUCTION_TEAM_SEEDS) {
-    await prisma.team.upsert({
-      where: { shortCode: team.shortCode },
-      update: {
-        name: team.name,
-        domain: team.domain,
-        pointsTotal: 1000,
-      },
-      create: {
-        name: team.name,
-        shortCode: team.shortCode,
-        domain: team.domain,
-        pointsTotal: 1000,
-        pointsSpent: 0,
-        sessionId,
-      },
+    const existing = await prisma.team.findFirst({
+      where: { sessionId, shortCode: team.shortCode },
+      select: { id: true },
     });
+
+    if (existing) {
+      await prisma.team.update({
+        where: { id: existing.id },
+        data: {
+          name: team.name,
+          domain: team.domain,
+          pointsTotal: 1000,
+        },
+      });
+    } else {
+      await prisma.team.create({
+        data: {
+          name: team.name,
+          shortCode: team.shortCode,
+          domain: team.domain,
+          pointsTotal: 1000,
+          pointsSpent: 0,
+          sessionId,
+        },
+      });
+    }
   }
 
   const sessionTeams = await prisma.team.findMany({

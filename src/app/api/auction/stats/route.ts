@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { AUCTION_TEAM_COUNT } from "@/lib/auctionTeams";
 import { requireAuctionAccess } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -13,13 +12,36 @@ export async function GET() {
   try {
     const supabase = getSupabaseAdminClient();
 
-    const [playersRes, txRes] = await Promise.all([
-      supabase.from("Player").select("status"),
-      supabase.from("Transaction").select("amount"),
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          soldCount: 0,
+          unsoldCount: 0,
+          totalSpent: 0,
+          totalTeams: 0,
+          totalPlayers: 0,
+        },
+      });
+    }
+
+    const [playersRes, txRes, teamsRes] = await Promise.all([
+      supabase.from("Player").select("status").eq("sessionId", session.id),
+      supabase.from("Transaction").select("amount").eq("sessionId", session.id),
+      supabase.from("Team").select("id").eq("sessionId", session.id),
     ]);
 
     if (playersRes.error) throw playersRes.error;
     if (txRes.error) throw txRes.error;
+    if (teamsRes.error) throw teamsRes.error;
 
     const players = playersRes.data || [];
     const transactions = txRes.data || [];
@@ -29,7 +51,7 @@ export async function GET() {
       (p) => p.status === "UNSOLD" || p.status === "IN_AUCTION",
     ).length;
     const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalTeams = AUCTION_TEAM_COUNT;
+    const totalTeams = teamsRes.data?.length ?? 0;
     const totalPlayers = players.length;
 
     return NextResponse.json({

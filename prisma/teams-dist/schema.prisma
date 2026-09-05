@@ -8,14 +8,17 @@ datasource db {
 }
 
 model Tournament {
-  id          String           @id @default(cuid())
-  name        String
-  formatType  String           @default("groups_16")
-  totalTeams  Int              @default(16)
-  status      TournamentStatus @default(SETUP)
-  createdBy   String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  formatType       String           @default("groups_16")
+  totalTeams       Int              @default(16)
+  numberOfGroups   Int              @default(4)
+  teamsPerGroup    Int              @default(4)
+  auctionSessionId String?
+  status           TournamentStatus @default(SETUP)
+  createdBy        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   teams            TdTeam[]
   groupAssignments TdGroupAssignment[]

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/auth";
 import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
+import { getMandatoryAuctionPlayerSlots } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { sortPlayersByAuctionOrder } from "@/lib/playerFilters";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -24,6 +25,7 @@ type TeamRow = {
   shortCode: string;
   pointsTotal: number;
   pointsSpent: number;
+  squadSize: number;
 };
 
 type PlayerRow = {
@@ -70,7 +72,7 @@ export async function GET() {
 
     const { data: teamData, error: teamError } = await supabase
       .from("Team")
-      .select("id,name,shortCode,pointsTotal,pointsSpent")
+      .select("id,name,shortCode,pointsTotal,pointsSpent,squadSize")
       .eq("sessionId", session.id)
       .eq("shortCode", WATCHER_TEAM_SHORT_CODE)
       .limit(1)
@@ -142,6 +144,7 @@ export async function GET() {
     const constraints = calculateTeamBidConstraints({
       pointsRemaining,
       playersOwnedCount: players.length,
+      mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(team.squadSize),
     });
 
     return NextResponse.json({

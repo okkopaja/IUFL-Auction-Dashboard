@@ -87,6 +87,21 @@ export async function PATCH(
     const now = new Date().toISOString();
     const supabase = getSupabaseAdminClient();
 
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "No active auction session found" },
+        { status: 404 },
+      );
+    }
+
     const { data: updatedPlayer, error: updateError } = await supabase
       .from("Player")
       .update({
@@ -97,6 +112,7 @@ export async function PATCH(
         updatedAt: now,
       })
       .eq("id", playerId)
+      .eq("sessionId", session.id)
       .select("id,name,position1,position2,imageUrl,updatedAt")
       .maybeSingle();
 

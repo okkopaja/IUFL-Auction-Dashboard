@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useSwitchTournament, useTournaments } from "@/hooks/useTeamsDist";
 import { ROUTES } from "@/lib/constants";
 import { IconsImportPanel } from "./icons-import/IconsImportPanel";
 import { TeamWiseExportPanel } from "./player-export/TeamWiseExportPanel";
@@ -60,6 +61,9 @@ async function postJson(url: string, body?: object) {
 export function AdminDashboardView() {
   const { signOut } = useAuth();
   const qc = useQueryClient();
+  const { data: tournaments = [], isLoading: tournamentsLoading } =
+    useTournaments();
+  const switchTournament = useSwitchTournament();
 
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [stats, setStats] = useState<AuctionStats | null>(null);
@@ -69,6 +73,12 @@ export function AdminDashboardView() {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [resetPassword, setResetPassword] = useState("");
   const [logsLoading, setLogsLoading] = useState(true);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>();
+
+  const selectedTournament =
+    tournaments.find((tournament) => tournament.id === selectedTournamentId) ??
+    tournaments.find((tournament) => tournament.isActive) ??
+    tournaments[0];
 
   // ── Data fetching ──────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -109,6 +119,28 @@ export function AdminDashboardView() {
       );
     } finally {
       setIsAdvancing(false);
+    }
+  };
+
+  const handleTournamentChange = async (tournamentId: string) => {
+    if (
+      !tournamentId ||
+      (tournamentId === selectedTournament?.id && selectedTournament?.isActive)
+    ) {
+      return;
+    }
+
+    setSelectedTournamentId(tournamentId);
+    try {
+      await switchTournament.mutateAsync(tournamentId);
+      toast.success("Tournament switched. Dashboard data refreshed.");
+      await fetchData();
+      await qc.invalidateQueries();
+    } catch (err: unknown) {
+      setSelectedTournamentId(selectedTournament?.id);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to switch tournament",
+      );
     }
   };
 
@@ -232,6 +264,32 @@ export function AdminDashboardView() {
 
           {/* Right controls */}
           <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="hidden sm:inline">Tournament</span>
+              <select
+                aria-label="Select tournament"
+                value={selectedTournament?.id ?? ""}
+                onChange={(event) => {
+                  void handleTournamentChange(event.target.value);
+                }}
+                disabled={
+                  tournamentsLoading ||
+                  switchTournament.isPending ||
+                  tournaments.length === 0
+                }
+                className="max-w-36 sm:max-w-52 rounded-lg border border-slate-700 bg-pitch-900 px-2.5 py-1.5 text-xs text-slate-200 outline-none transition-colors focus:border-accent-gold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {tournaments.length === 0 ? (
+                  <option value="">No tournaments</option>
+                ) : (
+                  tournaments.map((tournament) => (
+                    <option key={tournament.id} value={tournament.id}>
+                      {tournament.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
             <button
               type="button"
               onClick={fetchData}
@@ -274,7 +332,9 @@ export function AdminDashboardView() {
               Auction <span className="text-accent-gold">Control Centre</span>
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Restricted access — authenticated admin only
+              {selectedTournament
+                ? `${selectedTournament.name} · restricted access`
+                : "No tournament selected · restricted access"}
             </p>
           </div>
         </div>

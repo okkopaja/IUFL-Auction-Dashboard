@@ -3,6 +3,7 @@ import {
   POST as addPlayerToTeamPost,
   DELETE as removePlayerFromTeamDelete,
 } from "@/app/api/admin/teams/[id]/players/route";
+import { PATCH as updateTeamSquadSizePatch } from "@/app/api/admin/teams/[id]/squad-size/route";
 import {
   buildActionHistory,
   buildActiveSession,
@@ -106,6 +107,59 @@ describe("admin teams player management route", () => {
     const history = mockContext.supabase.state.AuctionActionHistory[0];
     expect(history.actionType).toBe("SELL");
     expect(history.transactionId).toBe(tx.id);
+  });
+
+  it("updates a team's squad size", async () => {
+    mockContext.supabase = createInMemorySupabase({
+      AuctionSession: [buildActiveSession()],
+      Team: [buildTeam({ id: "t1", squadSize: 16 })],
+    });
+
+    const response = await updateTeamSquadSizePatch(
+      new Request("http://localhost/api/admin/teams/t1/squad-size", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ squadSize: 20 }),
+      }) as unknown as Parameters<typeof updateTeamSquadSizePatch>[0],
+      buildRouteContext("t1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.squadSize).toBe(20);
+    expect(mockContext.supabase.state.Team[0].squadSize).toBe(20);
+  });
+
+  it("rejects a squad size below the current squad count", async () => {
+    mockContext.supabase = createInMemorySupabase({
+      AuctionSession: [buildActiveSession()],
+      Team: [buildTeam({ id: "t1", squadSize: 16 })],
+      Player: [
+        buildPlayer({ id: "p1", status: "SOLD", teamId: "t1" }),
+        buildPlayer({ id: "p2", status: "SOLD", teamId: "t1" }),
+        buildPlayer({ id: "p3", status: "SOLD", teamId: "t1" }),
+      ],
+      TeamRoleProfile: [
+        {
+          teamId: "t1",
+          role: "CAPTAIN",
+          name: "Captain",
+          imageUrl: null,
+        },
+      ],
+    });
+
+    const response = await updateTeamSquadSizePatch(
+      new Request("http://localhost/api/admin/teams/t1/squad-size", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ squadSize: 3 }),
+      }) as unknown as Parameters<typeof updateTeamSquadSizePatch>[0],
+      buildRouteContext("t1"),
+    );
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).success).toBe(false);
+    expect(mockContext.supabase.state.Team[0].squadSize).toBe(16);
   });
 
   it("rejects add when player is not UNSOLD", async () => {

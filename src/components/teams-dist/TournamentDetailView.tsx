@@ -3,13 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  Users,
-  Shuffle,
-  LayoutGrid,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, Users, Shuffle, LayoutGrid, Loader2 } from "lucide-react";
 import { useGroupBoard, useTeams, useTournament } from "@/hooks/useTeamsDist";
 import { TeamImport } from "@/components/teams-dist/TeamImport";
 import { DrawArena } from "@/components/teams-dist/DrawArena";
@@ -18,7 +12,11 @@ import { ROUTES } from "@/lib/constants";
 
 type Tab = "teams" | "draw" | "groups";
 
-const TABS: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
+const TABS: {
+  id: Tab;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+}[] = [
   { id: "teams", label: "Teams", icon: Users },
   { id: "draw", label: "Draw Arena", icon: Shuffle },
   { id: "groups", label: "Groups", icon: LayoutGrid },
@@ -44,7 +42,11 @@ export function TournamentDetailView({
   tournamentId: string;
 }) {
   const { data: tournament, isLoading: tLoading } = useTournament(tournamentId);
-  const { data: teams, isLoading: teamsLoading, refetch: refetchTeams } = useTeams(tournamentId);
+  const {
+    data: teams,
+    isLoading: teamsLoading,
+    refetch: refetchTeams,
+  } = useTeams(tournamentId);
   const { data: board } = useGroupBoard(tournamentId);
   const [tab, setTab] = useState<Tab>("teams");
 
@@ -60,7 +62,10 @@ export function TournamentDetailView({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-slate-400">Tournament not found.</p>
-        <Link href={ROUTES.TEAMS_DIST} className="text-violet-400 hover:underline text-sm">
+        <Link
+          href={ROUTES.TEAMS_DIST}
+          className="text-violet-400 hover:underline text-sm"
+        >
           ← Back to tournaments
         </Link>
       </div>
@@ -108,12 +113,13 @@ export function TournamentDetailView({
                 {label}
                 {id === "teams" && teams != null && (
                   <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[0.6rem] font-mono text-slate-500">
-                    {teams.length}/16
+                    {teams.length}/{tournament.totalTeams}
                   </span>
                 )}
                 {id === "groups" && board != null && (
                   <span className="rounded-full bg-slate-800 px-1.5 py-0.5 text-[0.6rem] font-mono text-slate-500">
-                    {(teams?.length ?? 0) - board.unassigned.length}/16
+                    {(teams?.length ?? 0) - board.unassigned.length}/
+                    {tournament.totalTeams}
                   </span>
                 )}
               </button>
@@ -145,6 +151,7 @@ export function TournamentDetailView({
                   <TeamImport
                     tournamentId={tournamentId}
                     teams={teams ?? []}
+                    totalTeams={tournament.totalTeams}
                     onImported={() => refetchTeams()}
                   />
                 )}
@@ -156,11 +163,11 @@ export function TournamentDetailView({
                 <h2 className="mb-5 text-xl font-bold text-slate-100">
                   Draw Arena
                 </h2>
-                {(teams?.length ?? 0) < 16 ? (
+                {(teams?.length ?? 0) < tournament.totalTeams ? (
                   <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-800 py-20 text-center">
                     <Users className="size-10 text-slate-700" />
                     <p className="font-semibold text-slate-400">
-                      Import 16 teams first
+                      Import {tournament.totalTeams} teams first
                     </p>
                     <button
                       type="button"

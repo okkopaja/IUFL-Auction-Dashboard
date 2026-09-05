@@ -16,6 +16,7 @@ import {
 import {
   AUCTION_BID_INCREMENT_OPTIONS,
   AUCTION_START_BID,
+  getMandatoryAuctionPlayerSlots,
 } from "@/lib/constants";
 import { useAuctionStore } from "@/store/auctionStore";
 import type { Player, Team, Transaction } from "@/types";
@@ -132,6 +133,9 @@ export function BidControls({
     ? calculateTeamBidConstraints({
         pointsRemaining: selectedTeam.pointsRemaining,
         playersOwnedCount: selectedTeam.playersOwnedCount,
+        mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(
+          selectedTeam.squadSize,
+        ),
       })
     : null;
 

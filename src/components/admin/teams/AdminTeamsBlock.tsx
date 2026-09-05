@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PLAYER_BASE_PRICE } from "@/lib/constants";
+import { AUCTION_FIXED_ROLE_SLOTS, PLAYER_BASE_PRICE } from "@/lib/constants";
 import { toDisplayImageUrl } from "@/lib/imageUrl";
 import type { Player, Team, TeamRoleSlot } from "@/types";
 
@@ -142,6 +142,15 @@ export function AdminTeamsBlock() {
     Record<string, string>
   >({});
   const [savingPointsTeamId, setSavingPointsTeamId] = useState<string | null>(
+    null,
+  );
+  const [editingSquadTeamId, setEditingSquadTeamId] = useState<string | null>(
+    null,
+  );
+  const [squadSizeDraftByTeamId, setSquadSizeDraftByTeamId] = useState<
+    Record<string, string>
+  >({});
+  const [savingSquadTeamId, setSavingSquadTeamId] = useState<string | null>(
     null,
   );
   const [assignmentTeam, setAssignmentTeam] = useState<Team | null>(null);
@@ -286,6 +295,52 @@ export function AdminTeamsBlock() {
           error instanceof Error
             ? error.message
             : "Failed to update team points",
+        );
+      },
+    });
+
+  const { mutateAsync: updateTeamSquadSize, isPending: isSavingSquadSize } =
+    useMutation({
+      mutationFn: async ({
+        teamId,
+        squadSize,
+      }: {
+        teamId: string;
+        squadSize: number;
+      }) => {
+        const res = await fetch(`/api/admin/teams/${teamId}/squad-size`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ squadSize }),
+        });
+
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || "Failed to update squad size");
+        }
+
+        return json.data as { squadSize: number };
+      },
+      onSuccess: async (_, variables) => {
+        toast.success("Team squad size updated");
+        setEditingSquadTeamId(null);
+        setSquadSizeDraftByTeamId((prev) => ({
+          ...prev,
+          [variables.teamId]: String(variables.squadSize),
+        }));
+
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["admin-teams"] }),
+          qc.invalidateQueries({ queryKey: ["teams"] }),
+          qc.invalidateQueries({ queryKey: ["team", variables.teamId] }),
+          qc.invalidateQueries({ queryKey: ["auction-current"] }),
+        ]);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update squad size",
         );
       },
     });
@@ -586,6 +641,37 @@ export function AdminTeamsBlock() {
     }
   };
 
+  const handleSaveSquadSize = async (team: Team) => {
+    const parsedSquadSize = parseWholeNumber(
+      squadSizeDraftByTeamId[team.id] ?? String(team.squadSize),
+    );
+
+    if (
+      parsedSquadSize === null ||
+      parsedSquadSize <= AUCTION_FIXED_ROLE_SLOTS
+    ) {
+      toast.error(
+        `Squad size must be at least ${AUCTION_FIXED_ROLE_SLOTS + 1}`,
+      );
+      return;
+    }
+
+    if (parsedSquadSize === team.squadSize) {
+      setEditingSquadTeamId(null);
+      return;
+    }
+
+    setSavingSquadTeamId(team.id);
+    try {
+      await updateTeamSquadSize({
+        teamId: team.id,
+        squadSize: parsedSquadSize,
+      });
+    } finally {
+      setSavingSquadTeamId(null);
+    }
+  };
+
   const isSquadMutationPending = isAddingPlayer || isRemovingPlayer;
 
   const unsoldPlayers = players.filter(
@@ -753,17 +839,87 @@ export function AdminTeamsBlock() {
                       </p>
                     </div>
                     <div className="bg-pitch-950/80 rounded-lg p-3 border border-slate-800/50 text-center shadow-inner flex flex-col items-center">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1 font-semibold">
-                        Squad
-                      </p>
-                      <p className="text-base font-mono font-bold text-slate-300">
-                        <span className="text-slate-100">
-                          {calculateTeamSquadCount(team)}
-                        </span>
-                        <span className="text-slate-600 ml-1 opacity-70">
-                          / 16
-                        </span>
-                      </p>
+                      <div className="w-full flex items-center justify-center gap-1">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+                          Squad
+                        </p>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-5 text-slate-500 hover:text-slate-200"
+                          aria-label={`Edit ${team.name} squad size`}
+                          title="Edit squad size"
+                          onClick={() => {
+                            setEditingSquadTeamId(team.id);
+                            setSquadSizeDraftByTeamId((prev) => ({
+                              ...prev,
+                              [team.id]: String(team.squadSize),
+                            }));
+                          }}
+                          disabled={isSavingSquadSize}
+                        >
+                          <PencilLine className="size-3" />
+                        </Button>
+                      </div>
+                      {editingSquadTeamId === team.id ? (
+                        <div className="mt-1 flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={AUCTION_FIXED_ROLE_SLOTS + 1}
+                            max={100}
+                            step={1}
+                            inputMode="numeric"
+                            value={
+                              squadSizeDraftByTeamId[team.id] ??
+                              String(team.squadSize)
+                            }
+                            onChange={(event) =>
+                              setSquadSizeDraftByTeamId((prev) => ({
+                                ...prev,
+                                [team.id]: event.target.value,
+                              }))
+                            }
+                            disabled={isSavingSquadSize}
+                            className="w-16 bg-pitch-900 border border-slate-700 rounded px-1.5 py-1 text-sm text-slate-200 text-center focus:outline-none focus:border-accent-gold/50"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-6 text-accent-gold"
+                            aria-label="Save squad size"
+                            onClick={() => void handleSaveSquadSize(team)}
+                            disabled={isSavingSquadSize}
+                          >
+                            {savingSquadTeamId === team.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              "✓"
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-6 text-slate-500"
+                            aria-label="Cancel squad size editing"
+                            onClick={() => setEditingSquadTeamId(null)}
+                            disabled={isSavingSquadSize}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-base font-mono font-bold text-slate-300">
+                          <span className="text-slate-100">
+                            {calculateTeamSquadCount(team)}
+                          </span>
+                          <span className="text-slate-600 ml-1 opacity-70">
+                            / {team.squadSize}
+                          </span>
+                        </p>
+                      )}
                     </div>
                   </div>
 

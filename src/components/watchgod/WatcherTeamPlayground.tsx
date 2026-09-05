@@ -15,6 +15,7 @@ import {
   type WatcherTeamLivePlayer,
 } from "@/hooks/useWatchgod";
 import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
+import { getMandatoryAuctionPlayerSlots } from "@/lib/constants";
 import { ErrorState } from "../shared/ErrorState";
 import { LoadingState } from "../shared/LoadingState";
 import { Button } from "../ui/button";
@@ -204,6 +205,9 @@ export function WatcherTeamPlayground() {
   const simulatedConstraints = calculateTeamBidConstraints({
     pointsRemaining: simulatedPointsRemaining,
     playersOwnedCount: simulatedPlayersOwnedCount,
+    mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(
+      watcherTeam?.squadSize ?? 16,
+    ),
   });
 
   const handleToggleLivePlayer = (playerId: string) => {

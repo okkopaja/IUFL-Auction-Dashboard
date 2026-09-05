@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/auth";
 import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
-import { PLAYER_BASE_PRICE } from "@/lib/constants";
+import {
+  getMandatoryAuctionPlayerSlots,
+  PLAYER_BASE_PRICE,
+} from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { sortPlayersByAuctionOrder } from "@/lib/playerFilters";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -39,6 +42,7 @@ type TeamRow = {
   shortCode: string;
   pointsTotal: number;
   pointsSpent: number;
+  squadSize: number;
 };
 
 type HistoryRow = {
@@ -131,6 +135,7 @@ export async function GET() {
             pointsSpent: number;
             pointsRemaining: number;
             playersOwnedCount: number;
+            squadSize: number;
             maxBid: number;
             canAffordMinimumBid: boolean;
           }>,
@@ -174,7 +179,7 @@ export async function GET() {
           .limit(5),
         supabase
           .from("Team")
-          .select("id,name,shortCode,pointsTotal,pointsSpent")
+          .select("id,name,shortCode,pointsTotal,pointsSpent,squadSize")
           .eq("sessionId", session.id)
           .order("name"),
       ]);
@@ -274,6 +279,7 @@ export async function GET() {
         const constraints = calculateTeamBidConstraints({
           pointsRemaining,
           playersOwnedCount,
+          mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(team.squadSize),
         });
 
         return {
@@ -284,6 +290,7 @@ export async function GET() {
           pointsSpent: team.pointsSpent,
           pointsRemaining,
           playersOwnedCount,
+          squadSize: team.squadSize,
           maxBid: constraints.maxAllowedBid,
           canAffordMinimumBid: constraints.canAffordMinimumBid,
         };

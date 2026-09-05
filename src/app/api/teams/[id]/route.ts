@@ -13,6 +13,20 @@ export async function GET(
     const { id } = await params;
     const supabase = await getSupabaseServerClient();
 
+    const { data: session, error: sessionError } = await supabase
+      .from("AuctionSession")
+      .select("id")
+      .eq("isActive", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session)
+      return NextResponse.json(
+        { success: false, error: "Not found" },
+        { status: 404 },
+      );
+
     const { data: team, error } = await supabase
       .from("Team")
       .select(`
@@ -22,6 +36,7 @@ export async function GET(
         transactions:Transaction(*)
       `)
       .eq("id", id)
+      .eq("sessionId", session.id)
       .maybeSingle();
 
     if (error) throw error;

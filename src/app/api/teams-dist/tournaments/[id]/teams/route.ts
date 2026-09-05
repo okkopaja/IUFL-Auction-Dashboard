@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { tdPrisma } from "@/lib/teams-dist/prisma";
 import { logger } from "@/lib/logger";
+import { syncTournamentTeamsToAuction } from "@/lib/teams-dist/syncAuctionTeams";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,8 @@ export async function POST(req: Request, { params }: Ctx) {
       },
       include: { groupAssignment: true },
     });
+
+    await syncTournamentTeamsToAuction(tournamentId, [team]);
 
     // Update tournament status
     const newCount = count + 1;

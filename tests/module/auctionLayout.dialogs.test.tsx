@@ -170,6 +170,7 @@ describe("AuctionLayout iteration dialogs", () => {
         name: "Team One",
         shortCode: "ONE",
         domain: "one.example",
+        squadSize: 16,
         pointsTotal: 1000,
         pointsSpent: 0,
         pointsRemaining: 1000,

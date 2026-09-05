@@ -1,5 +1,5 @@
-import { TEAM_COLORS } from "@/lib/constants";
 import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
+import { getMandatoryAuctionPlayerSlots, TEAM_COLORS } from "@/lib/constants";
 import { useAuctionStore } from "@/store/auctionStore";
 import type { Team } from "@/types";
 import { TeamLogo } from "../shared/TeamLogo";
@@ -20,13 +20,15 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
         const teamConstraints = calculateTeamBidConstraints({
           pointsRemaining: team.pointsRemaining,
           playersOwnedCount: team.playersOwnedCount,
+          mandatoryAuctionSlots: getMandatoryAuctionPlayerSlots(team.squadSize),
         });
 
         return (
-          <div
+          <button
+            type="button"
             key={team.id}
             onClick={() => setSelectedTeamId(team.id)}
-            className={`group relative flex items-center justify-between p-3 cursor-pointer transition-colors border-b border-[#222] last:border-b-0 ${
+            className={`group relative flex w-full items-center justify-between p-3 text-left cursor-pointer transition-colors border-b border-[#222] last:border-b-0 ${
               isSelected ? "bg-[#1a1a1a]" : "hover:bg-[#161616]"
             }`}
           >
@@ -78,7 +80,7 @@ export function TeamSidebar({ teams }: { teams: Team[] }) {
                 {team.pointsRemaining.toLocaleString()}
               </span>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>
