@@ -66,12 +66,14 @@ model Player {
   whatsappNumber  String?
   stream          String         @default("")
   importOrder     Int            @default(0)
+  auctionOrder    Int?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@index([sessionId])
   @@index([status])
   @@index([sessionId, importOrder])
+  @@index([sessionId, auctionOrder])
 }
 
 enum PlayerStatus {

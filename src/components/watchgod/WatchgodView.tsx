@@ -2,15 +2,19 @@
 
 import { UserButton } from "@clerk/nextjs";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Eye,
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
+  useReorderWatchgodQueue,
   useWatchgodSnapshot,
   WATCHGOD_PAGE_SIZE,
   type WatchgodProgressionRow,
@@ -58,6 +62,7 @@ export function WatchgodView() {
   const [page, setPage] = useState(1);
 
   const { data, isLoading, error, refetch, isFetching } = useWatchgodSnapshot();
+  const reorderQueue = useReorderWatchgodQueue();
 
   const progression = data?.progression ?? [];
   const teams = data?.teams ?? [];
@@ -206,8 +211,8 @@ export function WatchgodView() {
                     Live Progression Queue
                   </h2>
                   <p className="text-xs text-slate-500">
-                    5 passed players + current player + full upcoming queue
-                    (unsold)
+                    Move upcoming players one position at a time. Passed and
+                    live players are locked.
                   </p>
                 </div>
                 <div className="text-right text-xs text-slate-500">
@@ -225,11 +230,54 @@ export function WatchgodView() {
                         <th className="px-3 py-2">Player</th>
                         <th className="px-3 py-2">Queue</th>
                         <th className="px-3 py-2">State</th>
+                        <th className="px-3 py-2 text-right">Order</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedRows.map((row, idx) => {
                         const absoluteIndex = (page - 1) * pageSize + idx + 1;
+                        const progressionIndex = absoluteIndex - 1;
+                        const previousRow = progression[progressionIndex - 1];
+                        const nextRow = progression[progressionIndex + 1];
+                        const canMoveUp =
+                          row.queueType === "UPCOMING" &&
+                          !row.player.hasBeenPassed &&
+                          previousRow?.queueType === "UPCOMING" &&
+                          !previousRow.player.hasBeenPassed;
+                        const canMoveDown =
+                          row.queueType === "UPCOMING" &&
+                          !row.player.hasBeenPassed &&
+                          nextRow?.queueType === "UPCOMING" &&
+                          !nextRow.player.hasBeenPassed;
+
+                        const movePlayer = (direction: "UP" | "DOWN") => {
+                          reorderQueue.mutate(
+                            { playerId: row.player.id, direction },
+                            {
+                              onSuccess: () => {
+                                toast.success("Auction queue updated.");
+                              },
+                              onError: (requestError: unknown) => {
+                                const message =
+                                  typeof requestError === "object" &&
+                                  requestError !== null &&
+                                  "response" in requestError &&
+                                  typeof (
+                                    requestError as {
+                                      response?: { data?: { error?: unknown } };
+                                    }
+                                  ).response?.data?.error === "string"
+                                    ? (
+                                        requestError as {
+                                          response: { data: { error: string } };
+                                        }
+                                      ).response.data.error
+                                    : "Could not update the auction queue.";
+                                toast.error(message);
+                              },
+                            },
+                          );
+                        };
 
                         return (
                           <tr
@@ -264,6 +312,38 @@ export function WatchgodView() {
                               {row.actionType
                                 ? `${row.actionType} • ${formatTimestamp(row.actionAt ?? "")}`
                                 : row.player.status}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-7 text-slate-300 hover:bg-slate-800 hover:text-white"
+                                  aria-label={`Move ${row.player.name} up`}
+                                  title="Move up one queue position"
+                                  disabled={
+                                    !canMoveUp || reorderQueue.isPending
+                                  }
+                                  onClick={() => movePlayer("UP")}
+                                >
+                                  <ChevronUp className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-7 text-slate-300 hover:bg-slate-800 hover:text-white"
+                                  aria-label={`Move ${row.player.name} down`}
+                                  title="Move down one queue position"
+                                  disabled={
+                                    !canMoveDown || reorderQueue.isPending
+                                  }
+                                  onClick={() => movePlayer("DOWN")}
+                                >
+                                  <ChevronDown className="size-4" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );

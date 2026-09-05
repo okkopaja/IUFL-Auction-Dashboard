@@ -266,6 +266,7 @@ export type Database = {
           id: string;
           imageUrl: string | null;
           importOrder: number;
+          auctionOrder: number | null;
           name: string;
           position1: string;
           position2: string | null;
@@ -283,6 +284,7 @@ export type Database = {
           id: string;
           imageUrl?: string | null;
           importOrder?: number;
+          auctionOrder?: number | null;
           name: string;
           position1: string;
           position2?: string | null;
@@ -300,6 +302,7 @@ export type Database = {
           id?: string;
           imageUrl?: string | null;
           importOrder?: number;
+          auctionOrder?: number | null;
           name?: string;
           position1?: string;
           position2?: string | null;

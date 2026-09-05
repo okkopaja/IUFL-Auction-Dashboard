@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PLAYER_BASE_PRICE } from "@/lib/constants";
 import { logger } from "@/lib/logger";
-import { sortPlayersByAuctionOrder } from "@/lib/playerFilters";
+import { sortPlayersByAuctionQueueOrder } from "@/lib/playerFilters";
 import { getSupabaseServerClient } from "@/lib/supabase";
 import { withTransactionAmounts } from "@/lib/transactionAmounts";
 
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     }
 
     const normalizedPlayers = withTransactionAmounts(
-      sortPlayersByAuctionOrder(players ?? []).map((player) => ({
+      sortPlayersByAuctionQueueOrder(players ?? []).map((player) => ({
         ...player,
         basePrice: PLAYER_BASE_PRICE,
       })),

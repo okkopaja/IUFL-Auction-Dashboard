@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUpcomingQueuePlayers } from "@/lib/auctionQueue";
 import { requireSuperAdmin } from "@/lib/auth";
 import { calculateTeamBidConstraints } from "@/lib/bidConstraints";
 import {
@@ -6,7 +7,7 @@ import {
   PLAYER_BASE_PRICE,
 } from "@/lib/constants";
 import { logger } from "@/lib/logger";
-import { sortPlayersByAuctionOrder } from "@/lib/playerFilters";
+import { sortPlayersByAuctionQueueOrder } from "@/lib/playerFilters";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { buildLatestTransactionAmountMap } from "@/lib/transactionAmounts";
 
@@ -27,6 +28,7 @@ type PlayerRow = {
   name: string;
   position1: string;
   importOrder: number;
+  auctionOrder: number | null;
   status: "UNSOLD" | "IN_AUCTION" | "SOLD";
   teamId: string | null;
   team: {
@@ -70,39 +72,6 @@ type WatchgodProgressionRow = {
   actionAt: string | null;
   player: WatchgodPlayer;
 };
-
-function buildUpcomingPlayers(
-  orderedPlayers: WatchgodPlayer[],
-  currentPlayerId: string | null,
-): WatchgodPlayer[] {
-  if (orderedPlayers.length === 0) {
-    return [];
-  }
-
-  if (!currentPlayerId) {
-    return orderedPlayers.filter((player) => player.status === "UNSOLD");
-  }
-
-  const currentIndex = orderedPlayers.findIndex(
-    (player) => player.id === currentPlayerId,
-  );
-
-  if (currentIndex === -1) {
-    return orderedPlayers.filter((player) => player.status === "UNSOLD");
-  }
-
-  const upcoming: WatchgodPlayer[] = [];
-  for (let offset = 1; offset < orderedPlayers.length; offset += 1) {
-    const candidate =
-      orderedPlayers[(currentIndex + offset) % orderedPlayers.length];
-
-    if (candidate.status === "UNSOLD") {
-      upcoming.push(candidate);
-    }
-  }
-
-  return upcoming;
-}
 
 export async function GET() {
   const denied = await requireSuperAdmin();
@@ -159,41 +128,54 @@ export async function GET() {
 
     const session = sessionData as SessionRow;
 
-    const [playersRes, transactionsRes, historyRes, teamsRes] =
-      await Promise.all([
-        supabase
-          .from("Player")
-          .select(
-            "id,name,position1,importOrder,status,teamId,team:Team(id,name,shortCode)",
-          )
-          .eq("sessionId", session.id),
-        supabase
-          .from("Transaction")
-          .select("playerId,amount,createdAt")
-          .eq("sessionId", session.id),
-        supabase
-          .from("AuctionActionHistory")
-          .select("id,actionType,createdAt,fromPlayerId")
-          .eq("sessionId", session.id)
-          .order("createdAt", { ascending: false })
-          .limit(5),
-        supabase
-          .from("Team")
-          .select("id,name,shortCode,pointsTotal,pointsSpent,squadSize")
-          .eq("sessionId", session.id)
-          .order("name"),
-      ]);
+    const [
+      playersRes,
+      transactionsRes,
+      historyRes,
+      passedPlayerIdsRes,
+      teamsRes,
+    ] = await Promise.all([
+      supabase
+        .from("Player")
+        .select(
+          "id,name,position1,importOrder,auctionOrder,status,teamId,team:Team(id,name,shortCode)",
+        )
+        .eq("sessionId", session.id),
+      supabase
+        .from("Transaction")
+        .select("playerId,amount,createdAt")
+        .eq("sessionId", session.id),
+      supabase
+        .from("AuctionActionHistory")
+        .select("id,actionType,createdAt,fromPlayerId")
+        .eq("sessionId", session.id)
+        .order("createdAt", { ascending: false })
+        .limit(5),
+      supabase
+        .from("AuctionActionHistory")
+        .select("fromPlayerId")
+        .eq("sessionId", session.id),
+      supabase
+        .from("Team")
+        .select("id,name,shortCode,pointsTotal,pointsSpent,squadSize")
+        .eq("sessionId", session.id)
+        .order("name"),
+    ]);
 
     if (playersRes.error) throw playersRes.error;
     if (transactionsRes.error) throw transactionsRes.error;
     if (historyRes.error) throw historyRes.error;
+    if (passedPlayerIdsRes.error) throw passedPlayerIdsRes.error;
     if (teamsRes.error) throw teamsRes.error;
 
     const transactionAmountByPlayerId = buildLatestTransactionAmountMap(
       transactionsRes.data ?? [],
     );
+    const passedPlayerIds = new Set(
+      (passedPlayerIdsRes.data ?? []).map((history) => history.fromPlayerId),
+    );
 
-    const orderedPlayers = sortPlayersByAuctionOrder(
+    const orderedPlayers = sortPlayersByAuctionQueueOrder(
       ((playersRes.data ?? []) as PlayerRow[]).map((player) => ({
         ...player,
         transactionAmount: transactionAmountByPlayerId.get(player.id) ?? null,
@@ -205,6 +187,8 @@ export async function GET() {
       name: player.name,
       position1: player.position1,
       importOrder: player.importOrder,
+      auctionOrder: player.auctionOrder,
+      hasBeenPassed: passedPlayerIds.has(player.id),
       status: player.status,
       teamId: player.teamId,
       teamShortCode: player.teamShortCode,
@@ -235,7 +219,7 @@ export async function GET() {
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
-    const upcomingPlayers = buildUpcomingPlayers(
+    const upcomingPlayers = getUpcomingQueuePlayers(
       orderedPlayers,
       currentPlayer?.id ?? null,
     );

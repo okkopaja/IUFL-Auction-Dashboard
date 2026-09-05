@@ -59,6 +59,43 @@ describe("auction progression module", () => {
     expect(session.restartAckRequired).toBe(false);
   });
 
+  it("uses the Watchgod-managed queue order when selecting the next player", async () => {
+    const supabase = createInMemorySupabase({
+      AuctionSession: [buildActiveSession()],
+      Player: [
+        buildPlayer({
+          id: "p1",
+          name: "Current",
+          importOrder: 1,
+          auctionOrder: 0,
+          status: "IN_AUCTION",
+        }),
+        buildPlayer({
+          id: "p2",
+          name: "Originally next",
+          importOrder: 2,
+          auctionOrder: 2,
+          status: "UNSOLD",
+        }),
+        buildPlayer({
+          id: "p3",
+          name: "Moved up in Watchgod",
+          importOrder: 3,
+          auctionOrder: 1,
+          status: "UNSOLD",
+        }),
+      ],
+    });
+
+    const result = await advanceToNextPlayer(
+      supabase as unknown as ProgressionClient,
+      "session-1",
+      { referencePlayerId: "p1" },
+    );
+
+    expect(result.nextPlayer?.id).toBe("p3");
+  });
+
   it("marks restart acknowledgment required when first full unsold wrap completes", async () => {
     const supabase = createInMemorySupabase({
       AuctionSession: [

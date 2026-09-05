@@ -51,6 +51,7 @@ export interface Player {
   whatsappNumber?: string | null;
   stream?: string;
   importOrder?: number;
+  auctionOrder?: number | null;
   team?: Team | null;
 }
 

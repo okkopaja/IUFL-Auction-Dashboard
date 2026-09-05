@@ -1,4 +1,4 @@
-import { sortPlayersByAuctionOrder } from "@/lib/playerFilters";
+import { sortPlayersByAuctionQueueOrder } from "@/lib/playerFilters";
 import type { getSupabaseAdminClient } from "@/lib/supabase";
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
@@ -8,6 +8,7 @@ type ProgressionPlayer = {
   name: string;
   position1: string;
   importOrder: number;
+  auctionOrder?: number | null;
   status: "UNSOLD" | "IN_AUCTION" | "SOLD";
 };
 
@@ -49,7 +50,7 @@ function findNextUnsoldPlayer(
   players: ProgressionPlayer[],
   referenceIndex: number,
 ): NextUnsoldResult {
-  const orderedPlayers = sortPlayersByAuctionOrder(players);
+  const orderedPlayers = sortPlayersByAuctionQueueOrder(players);
 
   if (orderedPlayers.length === 0) {
     return {
@@ -96,7 +97,7 @@ function findRestartTarget(
   players: ProgressionPlayer[],
   anchorPlayerId: string | null,
 ) {
-  const orderedPlayers = sortPlayersByAuctionOrder(players);
+  const orderedPlayers = sortPlayersByAuctionQueueOrder(players);
 
   if (orderedPlayers.length === 0) {
     return null;
@@ -149,13 +150,13 @@ async function getOrderedSessionPlayers(
 ) {
   const { data, error } = await supabase
     .from("Player")
-    .select("id,name,position1,importOrder,status")
+    .select("id,name,position1,importOrder,auctionOrder,status")
     .eq("sessionId", sessionId)
     .order("importOrder");
 
   if (error) throw error;
 
-  return sortPlayersByAuctionOrder((data ?? []) as ProgressionPlayer[]);
+  return sortPlayersByAuctionQueueOrder((data ?? []) as ProgressionPlayer[]);
 }
 
 async function resetLivePlayer(

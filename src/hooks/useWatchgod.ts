@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export const WATCHGOD_PAGE_SIZE = 15;
@@ -10,6 +10,7 @@ export interface WatchgodPlayerRow {
   name: string;
   position1: string;
   importOrder: number;
+  hasBeenPassed: boolean;
   status: "UNSOLD" | "IN_AUCTION" | "SOLD";
   teamId: string | null;
   teamShortCode: string | null;
@@ -106,6 +107,29 @@ export function useWatchgodSnapshot() {
     refetchInterval: 2000,
     staleTime: 0,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useReorderWatchgodQueue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      playerId,
+      direction,
+    }: {
+      playerId: string;
+      direction: "UP" | "DOWN";
+    }) => {
+      const { data } = await api.patch("/watchgod/queue", {
+        playerId,
+        direction,
+      });
+      return data.data as { movedPlayerId: string; direction: "UP" | "DOWN" };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["watchgodSnapshot"] });
+    },
   });
 }
 

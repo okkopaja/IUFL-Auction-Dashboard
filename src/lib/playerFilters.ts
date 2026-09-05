@@ -53,7 +53,12 @@ export function getPositionGroup(
   return POSITION_GROUP_LOOKUP.get(normalized) ?? null;
 }
 
-type AuctionSortablePlayer = Pick<Player, "position1" | "importOrder" | "name">;
+type AuctionSortablePlayer = Pick<
+  Player,
+  "position1" | "importOrder" | "name"
+> & {
+  auctionOrder?: number | null;
+};
 
 function getAuctionPositionPriority(
   position1: string | null | undefined,
@@ -84,6 +89,28 @@ export function sortPlayersByAuctionOrder<T extends AuctionSortablePlayer>(
   players: T[],
 ): T[] {
   return [...players].sort(comparePlayersByAuctionOrder);
+}
+
+/**
+ * Uses the Watchgod-managed queue after it has been initialized. Until then,
+ * the original positional/import order remains the source of truth.
+ */
+export function sortPlayersByAuctionQueueOrder<T extends AuctionSortablePlayer>(
+  players: T[],
+): T[] {
+  const hasPersistedQueueOrder = players.every((player) =>
+    Number.isInteger(player.auctionOrder),
+  );
+
+  if (!hasPersistedQueueOrder) {
+    return sortPlayersByAuctionOrder(players);
+  }
+
+  return [...players].sort(
+    (a, b) =>
+      (a.auctionOrder as number) - (b.auctionOrder as number) ||
+      comparePlayersByAuctionOrder(a, b),
+  );
 }
 
 export function filterPlayersByPositionGroup(
