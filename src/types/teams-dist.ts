@@ -71,9 +71,15 @@ export interface TdDrawAction {
 
 // ── Group board helper ────────────────────────────────────────────────────────
 
-export type GroupName = "A" | "B" | "C" | "D";
+export type GroupName = string;
 export const GROUP_NAMES: GroupName[] = ["A", "B", "C", "D"];
 export const MAX_TEAMS_PER_GROUP = 4;
+
+export function getGroupNames(numberOfGroups: number): GroupName[] {
+  return Array.from({ length: numberOfGroups }, (_, index) =>
+    String.fromCharCode(65 + index)
+  );
+}
 
 export interface GroupSlot {
   groupName: GroupName;

@@ -31,10 +31,17 @@ interface Tournament {
   id: string;
   name: string;
   status: string;
+  numberOfGroups: number;
+  teamsPerGroup: number;
 }
 
-const GROUP_LABELS = ["A", "B", "C", "D"] as const;
-type GroupLabel = (typeof GROUP_LABELS)[number];
+type GroupLabel = string;
+
+interface PresetGroup {
+  groupName: string;
+  capacity: number;
+  teams: Array<{ id: string; name: string }>;
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -70,11 +77,13 @@ function SpinIndicator({ spinState }: { spinState: SpinState }) {
 
 function TeamCard({
   team,
+  groupLabels,
   stagedDrawMode,
   onStage,
   isLoading,
 }: {
   team: WatchdogTeam;
+  groupLabels: string[];
   stagedDrawMode: "SINGLE" | "BATCH";
   onStage: (teamId: string, groupName: GroupLabel | null) => Promise<void>;
   isLoading: boolean;
@@ -107,7 +116,7 @@ function TeamCard({
 
       {/* Group radio buttons */}
       <div className="flex items-center gap-1.5">
-        {GROUP_LABELS.map((g) => {
+        {groupLabels.map((g) => {
           const isSelected = isAssigned
             ? team.assignedGroup === g
             : stagedGroup === g;
@@ -149,18 +158,33 @@ function TeamCard({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | null }) {
+export function WatchdogTeamsDist({
+  tournament,
+  tournaments,
+}: {
+  tournament: Tournament | null;
+  tournaments: Tournament[];
+}) {
+  const [selectedTournamentId, setSelectedTournamentId] = useState(
+    tournament?.id ?? tournaments[0]?.id ?? ""
+  );
   const [teams, setTeams] = useState<WatchdogTeam[]>([]);
   const [spinState, setSpinState] = useState<SpinState>({
     isSpinning: false,
     drawMode: null,
   });
   const [loadingTeams, setLoadingTeams] = useState(false);
+  const [presetGroups, setPresetGroups] = useState<PresetGroup[]>([]);
+  const [loadingPresets, setLoadingPresets] = useState(false);
   const [stagingTeamId, setStagingTeamId] = useState<string | null>(null);
   const [stagedDrawMode, setStagedDrawMode] = useState<"SINGLE" | "BATCH">("SINGLE");
   const sseRef = useRef<EventSource | null>(null);
 
-  const tid = tournament?.id;
+  const selectedTournament = tournaments.find((candidate) => candidate.id === selectedTournamentId) ?? tournament;
+  const tid = selectedTournament?.id;
+  const groupLabels = Array.from({ length: selectedTournament?.numberOfGroups ?? 0 }, (_, index) =>
+    String.fromCharCode(65 + index)
+  );
 
   // ── Fetch teams ──────────────────────────────────────────────────────────────
   const fetchTeams = useCallback(async () => {
@@ -177,11 +201,26 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
     }
   }, [tid]);
 
+  const fetchPresets = useCallback(async () => {
+    if (!tid) return;
+    setLoadingPresets(true);
+    try {
+      const res = await fetch(`/api/watchgod/teams-dist/${tid}/presets`);
+      const json = await res.json();
+      if (json.success) setPresetGroups(json.data.groups);
+    } catch {
+      toast.error("Failed to load group presets");
+    } finally {
+      setLoadingPresets(false);
+    }
+  }, [tid]);
+
   // ── SSE spin-state ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!tid) return;
 
     fetchTeams();
+    fetchPresets();
 
     const es = new EventSource(`/api/watchgod/teams-dist/${tid}/spin-state`);
     sseRef.current = es;
@@ -193,6 +232,7 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
         // When a spin completes, refresh the team list to show new assignments
         if (!state.isSpinning) {
           fetchTeams();
+          fetchPresets();
         }
       } catch {
         // ignore parse errors
@@ -207,7 +247,39 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
       es.close();
       sseRef.current = null;
     };
-  }, [tid, fetchTeams]);
+  }, [tid, fetchTeams, fetchPresets]);
+
+  const setPreset = useCallback(async (teamId: string, groupName: string) => {
+    if (!tid) return;
+    try {
+      const res = await fetch(`/api/watchgod/teams-dist/${tid}/presets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, groupName }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      await fetchPresets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save group preset");
+    }
+  }, [tid, fetchPresets]);
+
+  const clearPreset = useCallback(async (teamId?: string) => {
+    if (!tid) return;
+    try {
+      const res = await fetch(`/api/watchgod/teams-dist/${tid}/presets`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teamId ? { teamId } : {}),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      await fetchPresets();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to clear group preset");
+    }
+  }, [tid, fetchPresets]);
 
   // ── Stage a team ─────────────────────────────────────────────────────────────
   const stageTeam = useCallback(
@@ -268,7 +340,7 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
   const assignedCount = teams.filter((t) => t.assignedGroup).length;
   const totalCount = teams.length;
 
-  if (!tournament) {
+  if (!selectedTournament) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-pitch-950 text-slate-300">
         <ShieldAlert className="size-10 text-slate-600" />
@@ -294,13 +366,23 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
             <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/10">
               <Eye className="size-4 text-violet-400" />
             </div>
-            <div>
+            <div className="flex items-center gap-3">
               <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500">
                 Superadmin · Draw Control
               </p>
               <h1 className="text-sm font-bold tracking-wide md:text-base">
                 Teams Distribution Watchdog
               </h1>
+              <select
+                value={selectedTournamentId}
+                onChange={(event) => setSelectedTournamentId(event.target.value)}
+                className="max-w-56 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-300"
+                aria-label="Select Watchgod tournament"
+              >
+                {tournaments.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -385,6 +467,70 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
           </div>
         </div>
 
+        {/* Predetermined groups */}
+        <section className="mb-5 rounded-2xl border border-emerald-800/40 bg-emerald-950/10 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-300">
+                Predetermined Groups
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {selectedTournament.numberOfGroups} groups · {selectedTournament.teamsPerGroup} teams per group. Presets are locked when drawing starts.
+              </p>
+            </div>
+            {presetGroups.some((group) => group.teams.length > 0) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => clearPreset()}
+                disabled={loadingPresets || spinState.isSpinning || selectedTournament.status === "DRAW_IN_PROGRESS" || selectedTournament.status === "DRAW_COMPLETE"}
+                className="border-rose-700/50 bg-rose-900/20 text-xs text-rose-400 hover:bg-rose-900/40"
+              >
+                Clear Presets
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {presetGroups.map((group) => (
+              <div key={group.groupName} className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-200">Group {group.groupName}</span>
+                  <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                    {group.teams.length}/{group.capacity}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {group.teams.map((team) => (
+                    <div key={team.id} className="flex items-center justify-between gap-2 rounded-lg bg-emerald-900/20 px-2 py-1.5 text-xs text-emerald-200">
+                      <span className="truncate">{team.name}</span>
+                      <button type="button" onClick={() => clearPreset(team.id)} disabled={selectedTournament.status === "DRAW_IN_PROGRESS" || selectedTournament.status === "DRAW_COMPLETE"} className="text-emerald-500 hover:text-rose-300" aria-label={`Remove ${team.name} preset`}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {group.teams.length < group.capacity && (
+                    <select
+                      value=""
+                      onChange={(event) => {
+                        if (event.target.value) void setPreset(event.target.value, group.groupName);
+                      }}
+                      disabled={loadingPresets || selectedTournament.status === "DRAW_IN_PROGRESS" || selectedTournament.status === "DRAW_COMPLETE"}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-400"
+                      aria-label={`Preset a team for Group ${group.groupName}`}
+                    >
+                      <option value="">Add team...</option>
+                      {teams.filter((team) => !team.assignedGroup && !presetGroups.some((candidate) => candidate.teams.some((presetTeam) => presetTeam.id === team.id))).map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Instructions */}
         <div className="mb-4 rounded-xl border border-violet-800/30 bg-violet-900/10 px-4 py-3 text-sm text-violet-300">
           <p>
@@ -408,6 +554,7 @@ export function WatchdogTeamsDist({ tournament }: { tournament: Tournament | nul
               <TeamCard
                 key={team.id}
                 team={team}
+                groupLabels={groupLabels}
                 stagedDrawMode={stagedDrawMode}
                 onStage={stageTeam}
                 isLoading={stagingTeamId === team.id}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/auth";
 import { tdPrisma } from "@/lib/teams-dist/prisma";
+import { getGroupNames } from "@/types/teams-dist";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,10 @@ export async function POST(req: Request, { params }: Ctx) {
     const { id: tournamentId } = await params;
     const body = await req.json();
     const { teamId, groupName, drawMode } = body ?? {};
+    const tournament = await tdPrisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) {
+      return NextResponse.json({ success: false, error: "Tournament not found" }, { status: 404 });
+    }
 
     if (!teamId || typeof teamId !== "string") {
       return NextResponse.json(
@@ -41,9 +46,9 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({ success: true, data: { cleared: true } });
     }
 
-    if (!["A", "B", "C", "D"].includes(groupName)) {
+    if (!getGroupNames(tournament.numberOfGroups).includes(groupName)) {
       return NextResponse.json(
-        { success: false, error: "groupName must be A, B, C, or D" },
+        { success: false, error: "groupName is not valid for this tournament" },
         { status: 400 }
       );
     }

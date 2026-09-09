@@ -10,8 +10,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-type QueueDirection = "UP" | "DOWN";
-
 type PlayerRow = {
   id: string;
   name: string;
@@ -32,16 +30,17 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const playerId = body?.playerId;
-    const direction = body?.direction as QueueDirection | undefined;
+    const targetPlayerId = body?.targetPlayerId;
 
-    if (
-      typeof playerId !== "string" ||
-      (direction !== "UP" && direction !== "DOWN")
-    ) {
+    if (typeof playerId !== "string" || typeof targetPlayerId !== "string") {
       return NextResponse.json(
-        { success: false, error: "playerId and direction are required" },
+        { success: false, error: "playerId and targetPlayerId are required" },
         { status: 400 },
       );
+    }
+
+    if (playerId === targetPlayerId) {
+      return invalidMove("Choose a different player to swap with");
     }
 
     const supabase = getSupabaseAdminClient();
@@ -100,37 +99,33 @@ export async function PATCH(request: NextRequest) {
       currentPlayers[0].id,
     );
     const playerIndex = upcoming.findIndex((player) => player.id === playerId);
+    const targetIndex = upcoming.findIndex(
+      (player) => player.id === targetPlayerId,
+    );
     const passedPlayerIds = new Set(
       (historyData ?? []).map((history) => history.fromPlayerId),
     );
 
-    if (playerIndex === -1) {
-      return invalidMove("Only an upcoming player can be moved");
-    }
-
-    const adjacentIndex =
-      direction === "UP" ? playerIndex - 1 : playerIndex + 1;
-    if (adjacentIndex < 0 || adjacentIndex >= upcoming.length) {
-      return invalidMove(
-        "That player is already at the edge of the upcoming queue",
-      );
+    if (playerIndex === -1 || targetIndex === -1) {
+      return invalidMove("Only upcoming players can be swapped");
     }
 
     const movingPlayer = upcoming[playerIndex];
-    const adjacentPlayer = upcoming[adjacentIndex];
-    if (passedPlayerIds.has(movingPlayer.id)) {
+    const targetPlayer = upcoming[targetIndex];
+    if (
+      passedPlayerIds.has(movingPlayer.id) ||
+      passedPlayerIds.has(targetPlayer.id)
+    ) {
       return invalidMove("Passed players cannot be moved");
     }
-    if (passedPlayerIds.has(adjacentPlayer.id)) {
-      return invalidMove("Passed players cannot be moved across");
-    }
+
     const orderByPlayerId = new Map(
       orderedPlayers.map((player, index) => [player.id, index]),
     );
     const movingOrder = orderByPlayerId.get(movingPlayer.id);
-    const adjacentOrder = orderByPlayerId.get(adjacentPlayer.id);
+    const targetOrder = orderByPlayerId.get(targetPlayer.id);
 
-    if (movingOrder === undefined || adjacentOrder === undefined) {
+    if (movingOrder === undefined || targetOrder === undefined) {
       throw new Error("Unable to resolve queue positions");
     }
 
@@ -139,7 +134,7 @@ export async function PATCH(request: NextRequest) {
       : orderedPlayers
           .filter(
             (player) =>
-              player.id !== movingPlayer.id && player.id !== adjacentPlayer.id,
+              player.id !== movingPlayer.id && player.id !== targetPlayer.id,
           )
           .map((player, index) => ({
             id: player.id,
@@ -158,13 +153,13 @@ export async function PATCH(request: NextRequest) {
     const [movingUpdate, adjacentUpdate] = await Promise.all([
       supabase
         .from("Player")
-        .update({ auctionOrder: adjacentOrder })
+        .update({ auctionOrder: targetOrder })
         .eq("id", movingPlayer.id)
         .eq("sessionId", session.id),
       supabase
         .from("Player")
         .update({ auctionOrder: movingOrder })
-        .eq("id", adjacentPlayer.id)
+        .eq("id", targetPlayer.id)
         .eq("sessionId", session.id),
     ]);
 
@@ -175,7 +170,7 @@ export async function PATCH(request: NextRequest) {
       success: true,
       data: {
         movedPlayerId: movingPlayer.id,
-        direction,
+        targetPlayerId: targetPlayer.id,
       },
     });
   } catch (error) {

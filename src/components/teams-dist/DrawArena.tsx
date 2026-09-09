@@ -48,7 +48,7 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
 
   const unassigned = board?.unassigned ?? [];
   const teamNames = unassigned.map((t) => t.name);
-  const groupNames = ["Group A", "Group B", "Group C", "Group D"];
+  const groupNames = (board?.groups ?? []).map((group) => `Group ${group.groupName}`);
 
   function addLog(text: string, type: DrawLog["type"]) {
     const entry: DrawLog = {
@@ -167,7 +167,9 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
               ) : (
                 <Shuffle className="size-3" />
               )}
-              {m === "single" ? "Single Draw" : "Batch Draw (4)"}
+              {m === "single"
+                ? "Single Draw"
+                : `Batch Draw (${board?.groups.length ?? 0})`}
             </button>
           ))}
         </div>
@@ -202,7 +204,7 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
           <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">
             Pool ({unassigned.length} remaining)
           </h3>
-          <div className="flex flex-col gap-1.5 max-h-[420px] overflow-y-auto">
+          <div className="flex max-h-105 flex-col gap-1.5 overflow-y-auto">
             <AnimatePresence>
               {unassigned.length === 0 ? (
                 <motion.div
@@ -258,6 +260,7 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
             ) : (
               <BatchSlotMachine
                 teamNames={teamNames}
+                groupNames={board?.groups.map((group) => group.groupName) ?? []}
                 result={batchResult}
                 isSpinning={isSpinning}
               />
@@ -271,7 +274,7 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
             onClick={triggerDraw}
             className="group relative flex items-center justify-center gap-2.5 overflow-hidden rounded-xl bg-violet-600 py-4 text-base font-black uppercase tracking-widest text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-[0_4px_24px_rgba(139,92,246,0.4)]"
           >
-            <span className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <span className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
             {isSpinning || drawMutation.isPending ? (
               <Loader2 className="size-5 animate-spin" />
             ) : drawMode === "single" ? (
@@ -320,7 +323,7 @@ export function DrawArena({ tournamentId }: { tournamentId: string }) {
           {!canDraw && unassigned.length > 0 && drawMode === "batch" && (
             <div className="flex items-center gap-1.5 text-xs text-amber-500">
               <AlertCircle className="size-3.5" />
-              Need ≥4 unassigned teams for batch draw
+              Need at least one unassigned team per group for batch draw
             </div>
           )}
 

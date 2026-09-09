@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
  *
  * Atomically replaces all non-assigned teams with the new set.
  * Validation:
- *  - Exactly 16 rows
+ *  - Exactly the configured tournament team count
  *  - All team_name values must be unique and non-empty
  *  - Cannot import while a draw is in progress / complete
  */
@@ -53,11 +53,11 @@ export async function POST(req: Request, { params }: Ctx) {
     const rows: TeamCsvRow[] = Array.isArray(body.teams) ? body.teams : [];
 
     // --- Validation ---
-    if (rows.length !== 16) {
+    if (rows.length !== tournament.totalTeams) {
       return NextResponse.json(
         {
           success: false,
-          error: `Expected exactly 16 teams, got ${rows.length}`,
+          error: `Expected exactly ${tournament.totalTeams} teams, got ${rows.length}`,
         },
         { status: 422 }
       );
@@ -78,7 +78,7 @@ export async function POST(req: Request, { params }: Ctx) {
     }
 
     const uniqueNames = new Set(names.map((n) => n.toLowerCase()));
-    if (uniqueNames.size !== 16) {
+    if (uniqueNames.size !== tournament.totalTeams) {
       return NextResponse.json(
         { success: false, error: "Duplicate team names detected" },
         { status: 422 }

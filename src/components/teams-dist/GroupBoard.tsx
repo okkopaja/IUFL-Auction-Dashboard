@@ -100,7 +100,7 @@ export function GroupBoard({
       {groups.map((g) => {
         const gName = g.groupName as GroupName;
         const style = GROUP_STYLES[gName] ?? GROUP_STYLES.A;
-        const slots = Array.from({ length: 4 }, (_, i) => g.teams[i] ?? null);
+        const slots = Array.from({ length: g.capacity }, (_, i) => g.teams[i] ?? null);
 
         return (
           <motion.div

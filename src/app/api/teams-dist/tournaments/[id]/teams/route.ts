@@ -97,10 +97,15 @@ export async function POST(req: Request, { params }: Ctx) {
     }
 
     // Count existing teams
+    const tournament = await tdPrisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) {
+      return NextResponse.json({ success: false, error: "Tournament not found" }, { status: 404 });
+    }
+
     const count = await tdPrisma.tdTeam.count({ where: { tournamentId } });
-    if (count >= 16) {
+    if (count >= tournament.totalTeams) {
       return NextResponse.json(
-        { success: false, error: "Tournament already has 16 teams (maximum)" },
+        { success: false, error: `Tournament already has ${tournament.totalTeams} teams (maximum)` },
         { status: 422 }
       );
     }
@@ -126,7 +131,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
     // Update tournament status
     const newCount = count + 1;
-    if (newCount >= 16) {
+    if (newCount >= tournament.totalTeams) {
       await tdPrisma.tournament.update({
         where: { id: tournamentId },
         data: { status: "TEAMS_READY" },

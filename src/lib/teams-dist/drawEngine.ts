@@ -10,12 +10,15 @@ import { tdPrisma } from "@/lib/teams-dist/prisma";
 import {
   GROUP_NAMES,
   MAX_TEAMS_PER_GROUP,
+  getGroupNames,
   type BatchDrawResult,
   type GroupName,
   type SingleDrawResult,
   type TdTeam,
   type UndoDrawResult,
 } from "@/types/teams-dist";
+
+type GroupPresetRow = { teamId: string; groupName: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,10 +88,14 @@ async function getGroupSlotCounts(tournamentId: string) {
 }
 
 /** Groups with remaining capacity */
-async function getEligibleGroups(tournamentId: string): Promise<GroupName[]> {
+async function getEligibleGroups(
+  tournamentId: string,
+  numberOfGroups = GROUP_NAMES.length,
+  teamsPerGroup = MAX_TEAMS_PER_GROUP
+): Promise<GroupName[]> {
   const counts = await getGroupSlotCounts(tournamentId);
-  return GROUP_NAMES.filter(
-    (g) => (counts[g] ?? 0) < MAX_TEAMS_PER_GROUP
+  return getGroupNames(numberOfGroups).filter(
+    (g) => (counts[g] ?? 0) < teamsPerGroup
   );
 }
 
@@ -112,9 +119,20 @@ export async function executeSingleDraw(
   // Signal start of a single spin
   await setSpinState(tournamentId, true, "SINGLE");
 
-  const [unassigned, eligible] = await Promise.all([
+  const tournament = await tdPrisma.tournament.findUniqueOrThrow({
+    where: { id: tournamentId },
+  });
+  const [unassigned, eligible, presets] = await Promise.all([
     getUnassignedTeams(tournamentId),
-    getEligibleGroups(tournamentId),
+    getEligibleGroups(
+      tournamentId,
+      tournament.numberOfGroups,
+      tournament.teamsPerGroup
+    ),
+    tdPrisma.tdGroupPreset.findMany({
+      where: { tournamentId },
+      include: { team: true },
+    }),
   ]);
 
   if (unassigned.length === 0) {
@@ -132,7 +150,14 @@ export async function executeSingleDraw(
   });
   let team: any;
   let group: GroupName;
-  if (staged) {
+  const preset = presets.find((candidate: GroupPresetRow) =>
+    eligible.includes(candidate.groupName) &&
+    unassigned.some((candidateTeam: { id: string }) => candidateTeam.id === candidate.teamId)
+  );
+  if (preset) {
+    team = unassigned.find((candidate: { id: string }) => candidate.id === preset.teamId);
+    group = preset.groupName;
+  } else if (staged) {
     // Consume the staged entry
     await tdPrisma.tdWatchdogStage.delete({ where: { id: staged.id } });
     const foundTeam = await tdPrisma.tdTeam.findFirst({
@@ -220,9 +245,17 @@ export async function executeBatchDraw(
   // Signal start of a batch spin
   await setSpinState(tournamentId, true, "BATCH");
 
-  const [unassigned, eligible] = await Promise.all([
+  const tournament = await tdPrisma.tournament.findUniqueOrThrow({
+    where: { id: tournamentId },
+  });
+  const [unassigned, eligible, presets] = await Promise.all([
     getUnassignedTeams(tournamentId),
-    getEligibleGroups(tournamentId),
+    getEligibleGroups(
+      tournamentId,
+      tournament.numberOfGroups,
+      tournament.teamsPerGroup
+    ),
+    tdPrisma.tdGroupPreset.findMany({ where: { tournamentId } }),
   ]);
 
   if (unassigned.length === 0) {
@@ -234,33 +267,51 @@ export async function executeBatchDraw(
     throw new DrawEngineError("All groups are full.");
   }
 
-  // Consume exactly ONE staged entry per draw call (if any exist for BATCH mode).
-  // This ensures staged preselections are assigned one-at-a-time across draws,
-  // rather than all at once in a single batch action.
-  const staged = await tdPrisma.tdWatchdogStage.findFirst({
+  const stagedEntries = await tdPrisma.tdWatchdogStage.findMany({
     where: { tournamentId, drawMode: "BATCH" },
   });
 
-  let team: any;
-  let group: GroupName;
+  const availableTeams = [...unassigned];
+  const selections: Array<{ team: (typeof unassigned)[number]; group: GroupName }> = [];
+  const consumedStageIds: string[] = [];
 
-  if (staged) {
-    // Consume only this one staged entry
-    await tdPrisma.tdWatchdogStage.delete({ where: { id: staged.id } });
-    const foundTeam = await tdPrisma.tdTeam.findFirst({
-      where: { id: staged.teamId, tournamentId },
-    });
-    if (!foundTeam) throw new DrawEngineError("Staged team not found.");
-    team = foundTeam;
-    group = staged.groupName as GroupName;
-  } else {
-    // Random fallback: pick 1 team and 1 group
-    team = unassigned[secureRandInt(unassigned.length)];
-    group = eligible[secureRandInt(eligible.length)] as GroupName;
+  // A batch assigns one distinct team to every currently eligible group.
+  // Staged assignments win for their matching group; all remaining choices
+  // retain the normal random team selection.
+  for (const group of eligible) {
+    const preset = presets.find(
+      (entry: GroupPresetRow) =>
+        entry.groupName === group &&
+        availableTeams.some((team: { id: string }) => team.id === entry.teamId)
+    );
+    const staged = stagedEntries.find(
+      (entry: { groupName: string; teamId: string; id: string }) =>
+        entry.groupName === group &&
+        availableTeams.some((team: { id: string }) => team.id === entry.teamId)
+    );
+    const selectedTeamId = preset?.teamId ?? staged?.teamId;
+    const team = selectedTeamId
+      ? availableTeams.find((candidate: { id: string }) => candidate.id === selectedTeamId)
+      : undefined;
+    const resolvedTeam = team ?? availableTeams[secureRandInt(availableTeams.length)];
+
+    if (!resolvedTeam) break;
+
+    selections.push({ team: resolvedTeam, group });
+    availableTeams.splice(availableTeams.indexOf(resolvedTeam), 1);
+    if (staged && !preset) consumedStageIds.push(staged.id);
   }
 
-  const slotIndex = await getNextSlotIndex(tournamentId, group);
-  const payload = [{ teamId: team.id, teamName: team.name, group }];
+  if (selections.length === 0) {
+    await setSpinState(tournamentId, false);
+    throw new DrawEngineError("No drawable team/group pairs remain.");
+  }
+
+  const payload = selections.map(({ team, group }) => ({
+    teamId: team.id,
+    teamName: team.name,
+    group,
+  }));
 
   const action = await tdPrisma.$transaction(async (tx: any) => {
     await tx.tdDrawAction.updateMany({
@@ -278,16 +329,28 @@ export async function executeBatchDraw(
       },
     });
 
-    await tx.tdGroupAssignment.create({
-      data: {
-        tournamentId,
-        teamId: team.id,
-        groupName: group,
-        slotIndex,
-        drawMode: "BATCH",
-        actionId: newAction.id,
-      },
-    });
+    for (const { team, group } of selections) {
+      const slotIndex = await tx.tdGroupAssignment.count({
+        where: { tournamentId, groupName: group },
+      });
+
+      await tx.tdGroupAssignment.create({
+        data: {
+          tournamentId,
+          teamId: team.id,
+          groupName: group,
+          slotIndex,
+          drawMode: "BATCH",
+          actionId: newAction.id,
+        },
+      });
+    }
+
+    if (consumedStageIds.length > 0) {
+      await tx.tdWatchdogStage.deleteMany({
+        where: { id: { in: consumedStageIds } },
+      });
+    }
 
     await tx.tournament.update({
       where: { id: tournamentId },
@@ -297,10 +360,10 @@ export async function executeBatchDraw(
     return newAction;
   });
 
-  // Reset spin state after this single assignment completes
+  // Reset spin state after the complete batch finishes.
   await setSpinState(tournamentId, false);
 
-  const remaining = unassigned.length - 1;
+  const remaining = unassigned.length - selections.length;
   if (remaining === 0) {
     await tdPrisma.tournament.update({
       where: { id: tournamentId },
@@ -308,14 +371,19 @@ export async function executeBatchDraw(
     });
   }
 
-  const teamWithAssignment = await tdPrisma.tdTeam.findUniqueOrThrow({
-    where: { id: team.id },
+  const teamsWithAssignments = await tdPrisma.tdTeam.findMany({
+    where: { id: { in: selections.map(({ team }) => team.id) } },
     include: { groupAssignment: true },
   });
 
   return {
     mode: "batch",
-    assignments: [{ team: serializeTeam(teamWithAssignment), group }],
+    assignments: selections.map(({ team, group }) => ({
+      team: serializeTeam(
+        teamsWithAssignments.find((candidate: { id: string }) => candidate.id === team.id)!
+      ),
+      group,
+    })),
     action: {
       ...action,
       createdAt: action.createdAt.toISOString(),

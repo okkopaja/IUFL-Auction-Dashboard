@@ -117,7 +117,7 @@ export function SingleSlotMachine({
   );
 }
 
-// ── Batch (4-team) slot machine ───────────────────────────────────────────────
+// ── Batch (one team per group) slot machine ──────────────────────────────────
 
 const GROUP_BADGE_COLORS: Record<GroupName, string> = {
   A: "bg-violet-900/60 text-violet-300 border-violet-600/40",
@@ -128,10 +128,12 @@ const GROUP_BADGE_COLORS: Record<GroupName, string> = {
 
 export function BatchSlotMachine({
   teamNames,
+  groupNames,
   result,
   isSpinning,
 }: {
   teamNames: string[];
+  groupNames: string[];
   result: BatchDrawResult | null;
   isSpinning: boolean;
 }) {
@@ -139,10 +141,10 @@ export function BatchSlotMachine({
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      {(["A", "B", "C", "D"] as GroupName[]).map((g, i) => (
+      {groupNames.map((g, i) => (
         <div key={g} className="flex flex-col gap-1.5">
           <div
-            className={`flex h-7 items-center justify-center rounded-lg border text-xs font-bold tracking-widest ${GROUP_BADGE_COLORS[g]}`}
+            className={`flex h-7 items-center justify-center rounded-lg border text-xs font-bold tracking-widest ${GROUP_BADGE_COLORS[g as GroupName] ?? "bg-slate-900/60 text-slate-300 border-slate-600/40"}`}
           >
             Group {g}
           </div>

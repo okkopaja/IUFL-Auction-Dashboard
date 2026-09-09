@@ -23,6 +23,7 @@ model Tournament {
   teams            TdTeam[]
   groupAssignments TdGroupAssignment[]
   drawActions      TdDrawAction[]
+  groupPresets     TdGroupPreset[]
   watchdogStages   TdWatchdogStage[]
   watchdogSpinState TdWatchdogSpinState?
 }
@@ -40,6 +41,7 @@ model TdTeam {
   createdAt     DateTime   @default(now())
 
   groupAssignment  TdGroupAssignment?
+  groupPreset      TdGroupPreset?
   watchdogStages   TdWatchdogStage[]
 
   @@unique([tournamentId, name])
@@ -62,6 +64,20 @@ model TdGroupAssignment {
   @@unique([tournamentId, groupName, slotIndex])
   @@index([tournamentId, groupName])
   @@index([actionId])
+}
+
+model TdGroupPreset {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId       String     @unique
+  team         TdTeam     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  groupName    String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([tournamentId, teamId])
+  @@index([tournamentId, groupName])
 }
 
 model TdDrawAction {

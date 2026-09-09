@@ -116,16 +116,16 @@ export function useReorderWatchgodQueue() {
   return useMutation({
     mutationFn: async ({
       playerId,
-      direction,
+      targetPlayerId,
     }: {
       playerId: string;
-      direction: "UP" | "DOWN";
+      targetPlayerId: string;
     }) => {
       const { data } = await api.patch("/watchgod/queue", {
         playerId,
-        direction,
+        targetPlayerId,
       });
-      return data.data as { movedPlayerId: string; direction: "UP" | "DOWN" };
+      return data.data as { movedPlayerId: string; targetPlayerId: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["watchgodSnapshot"] });

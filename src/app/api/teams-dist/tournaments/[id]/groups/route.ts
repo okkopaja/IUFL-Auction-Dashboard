@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { tdPrisma } from "@/lib/teams-dist/prisma";
-import { GROUP_NAMES, type GroupName } from "@/types/teams-dist";
+import { getGroupNames, type GroupName } from "@/types/teams-dist";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   try {
     const { id: tournamentId } = await params;
 
-    const [teams, latestAction] = await Promise.all([
+    const [tournament, teams, latestAction] = await Promise.all([
+      tdPrisma.tournament.findUnique({ where: { id: tournamentId } }),
       tdPrisma.tdTeam.findMany({
         where: { tournamentId },
         include: { groupAssignment: true },
@@ -32,6 +33,10 @@ export async function GET(_req: Request, { params }: Ctx) {
         orderBy: { createdAt: "desc" },
       }),
     ]);
+
+    if (!tournament) {
+      return NextResponse.json({ success: false, error: "Tournament not found" }, { status: 404 });
+    }
 
     // Serialise
     // biome-ignore lint/suspicious/noExplicitAny: generated runtime type
@@ -47,7 +52,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     }));
 
     // Build group board
-    const groups = GROUP_NAMES.map((g: GroupName) => ({
+    const groups = getGroupNames(tournament.numberOfGroups).map((g: GroupName) => ({
       groupName: g,
       teams: serializedTeams
         .filter((t: any) => t.groupAssignment?.groupName === g)
@@ -58,8 +63,8 @@ export async function GET(_req: Request, { params }: Ctx) {
         ),
       isFull:
         serializedTeams.filter((t: any) => t.groupAssignment?.groupName === g)
-          .length >= 4,
-      capacity: 4,
+            .length >= tournament.teamsPerGroup,
+          capacity: tournament.teamsPerGroup,
     }));
 
     const unassigned = serializedTeams.filter((t: any) => !t.groupAssignment);
@@ -71,7 +76,7 @@ export async function GET(_req: Request, { params }: Ctx) {
         unassigned,
         canUndo: !!latestAction,
         canDrawSingle: unassigned.length > 0,
-        canDrawBatch: unassigned.length >= 4,
+        canDrawBatch: unassigned.length >= Math.min(tournament.numberOfGroups, tournament.totalTeams),
         isComplete: unassigned.length === 0,
       },
     });

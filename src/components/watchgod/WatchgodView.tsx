@@ -1,22 +1,13 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Eye,
-  RefreshCw,
-  ShieldAlert,
-} from "lucide-react";
+import { Eye, GripVertical, RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { type DragEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   useReorderWatchgodQueue,
   useWatchgodSnapshot,
-  WATCHGOD_PAGE_SIZE,
   type WatchgodProgressionRow,
 } from "@/hooks/useWatchgod";
 import { ROUTES } from "@/lib/constants";
@@ -59,26 +50,57 @@ function getQueueTone(queueType: WatchgodProgressionRow["queueType"]) {
 }
 
 export function WatchgodView() {
-  const [page, setPage] = useState(1);
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch, isFetching } = useWatchgodSnapshot();
   const reorderQueue = useReorderWatchgodQueue();
 
   const progression = data?.progression ?? [];
   const teams = data?.teams ?? [];
-  const pageSize = data?.meta.pageSize ?? WATCHGOD_PAGE_SIZE;
-  const totalPages = Math.max(1, Math.ceil(progression.length / pageSize));
+  const swappablePlayerIds = useMemo(
+    () =>
+      new Set(
+        progression
+          .filter(
+            (row) => row.queueType === "UPCOMING" && !row.player.hasBeenPassed,
+          )
+          .map((row) => row.player.id),
+      ),
+    [progression],
+  );
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
+  const swapPlayers = (playerId: string, targetPlayerId: string) => {
+    if (playerId === targetPlayerId || reorderQueue.isPending) {
+      return;
     }
-  }, [page, totalPages]);
 
-  const paginatedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return progression.slice(start, start + pageSize);
-  }, [page, pageSize, progression]);
+    reorderQueue.mutate(
+      { playerId, targetPlayerId },
+      {
+        onSuccess: () => {
+          toast.success("Auction queue updated.");
+        },
+        onError: (requestError: unknown) => {
+          const message =
+            typeof requestError === "object" &&
+            requestError !== null &&
+            "response" in requestError &&
+            typeof (
+              requestError as {
+                response?: { data?: { error?: unknown } };
+              }
+            ).response?.data?.error === "string"
+              ? (
+                  requestError as {
+                    response: { data: { error: string } };
+                  }
+                ).response.data.error
+              : "Could not update the auction queue.";
+          toast.error(message);
+        },
+      },
+    );
+  };
 
   if (isLoading) {
     return <LoadingState />;
@@ -211,8 +233,7 @@ export function WatchgodView() {
                     Live Progression Queue
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Move upcoming players one position at a time. Passed and
-                    live players are locked.
+                    Upcoming queue order updates live.
                   </p>
                 </div>
                 <div className="text-right text-xs text-slate-500">
@@ -222,7 +243,7 @@ export function WatchgodView() {
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-800">
-                <div className="max-h-[65dvh] overflow-auto">
+                <div className="max-h-[30.5rem] overflow-auto">
                   <table className="min-w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-pitch-900">
                       <tr className="border-b border-slate-800 text-left text-[10px] uppercase tracking-[0.15em] text-slate-500 whitespace-nowrap">
@@ -230,59 +251,79 @@ export function WatchgodView() {
                         <th className="px-3 py-2">Player</th>
                         <th className="px-3 py-2">Queue</th>
                         <th className="px-3 py-2">State</th>
-                        <th className="px-3 py-2 text-right">Order</th>
+                        <th className="px-3 py-2 text-right">Move</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedRows.map((row, idx) => {
-                        const absoluteIndex = (page - 1) * pageSize + idx + 1;
-                        const progressionIndex = absoluteIndex - 1;
-                        const previousRow = progression[progressionIndex - 1];
-                        const nextRow = progression[progressionIndex + 1];
-                        const canMoveUp =
-                          row.queueType === "UPCOMING" &&
-                          !row.player.hasBeenPassed &&
-                          previousRow?.queueType === "UPCOMING" &&
-                          !previousRow.player.hasBeenPassed;
-                        const canMoveDown =
-                          row.queueType === "UPCOMING" &&
-                          !row.player.hasBeenPassed &&
-                          nextRow?.queueType === "UPCOMING" &&
-                          !nextRow.player.hasBeenPassed;
+                      {progression.map((row, idx) => {
+                        const absoluteIndex = idx + 1;
+                        const canSwap =
+                          swappablePlayerIds.has(row.player.id) &&
+                          !reorderQueue.isPending;
+                        const isDragging = draggedPlayerId === row.player.id;
+                        const isDropTarget =
+                          Boolean(draggedPlayerId) &&
+                          draggedPlayerId !== row.player.id &&
+                          canSwap;
 
-                        const movePlayer = (direction: "UP" | "DOWN") => {
-                          reorderQueue.mutate(
-                            { playerId: row.player.id, direction },
-                            {
-                              onSuccess: () => {
-                                toast.success("Auction queue updated.");
-                              },
-                              onError: (requestError: unknown) => {
-                                const message =
-                                  typeof requestError === "object" &&
-                                  requestError !== null &&
-                                  "response" in requestError &&
-                                  typeof (
-                                    requestError as {
-                                      response?: { data?: { error?: unknown } };
-                                    }
-                                  ).response?.data?.error === "string"
-                                    ? (
-                                        requestError as {
-                                          response: { data: { error: string } };
-                                        }
-                                      ).response.data.error
-                                    : "Could not update the auction queue.";
-                                toast.error(message);
-                              },
-                            },
+                        const handleDragStart = (
+                          event: DragEvent<HTMLTableRowElement>,
+                        ) => {
+                          if (!canSwap) {
+                            event.preventDefault();
+                            return;
+                          }
+
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData(
+                            "text/plain",
+                            row.player.id,
                           );
+                          setDraggedPlayerId(row.player.id);
+                        };
+
+                        const handleDragOver = (
+                          event: DragEvent<HTMLTableRowElement>,
+                        ) => {
+                          if (isDropTarget) {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }
+                        };
+
+                        const handleDrop = (
+                          event: DragEvent<HTMLTableRowElement>,
+                        ) => {
+                          event.preventDefault();
+
+                          if (isDropTarget) {
+                            const playerId =
+                              event.dataTransfer.getData("text/plain");
+                            swapPlayers(playerId, row.player.id);
+                          }
+
+                          setDraggedPlayerId(null);
                         };
 
                         return (
                           <tr
                             key={row.id}
-                            className="border-b border-slate-800/80 text-slate-200 last:border-none"
+                            draggable={canSwap}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onDragEnd={() => setDraggedPlayerId(null)}
+                            className={`h-16 border-b border-slate-800/80 text-slate-200 transition-colors last:border-none ${
+                              canSwap
+                                ? "cursor-grab active:cursor-grabbing"
+                                : ""
+                            } ${
+                              isDragging ? "bg-accent-gold/10 opacity-70" : ""
+                            } ${
+                              isDropTarget
+                                ? "outline outline-1 -outline-offset-1 outline-emerald-400/70"
+                                : ""
+                            }`}
                           >
                             <td className="px-3 py-2 font-mono text-xs text-slate-400 whitespace-nowrap">
                               {absoluteIndex}
@@ -315,34 +356,20 @@ export function WatchgodView() {
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex justify-end gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-7 text-slate-300 hover:bg-slate-800 hover:text-white"
-                                  aria-label={`Move ${row.player.name} up`}
-                                  title="Move up one queue position"
-                                  disabled={
-                                    !canMoveUp || reorderQueue.isPending
+                                <span
+                                  className={`inline-flex size-7 items-center justify-center rounded-md ${
+                                    canSwap
+                                      ? "text-slate-300"
+                                      : "text-slate-600"
+                                  }`}
+                                  title={
+                                    canSwap
+                                      ? "Drag to swap queue position"
+                                      : "Locked"
                                   }
-                                  onClick={() => movePlayer("UP")}
                                 >
-                                  <ChevronUp className="size-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-7 text-slate-300 hover:bg-slate-800 hover:text-white"
-                                  aria-label={`Move ${row.player.name} down`}
-                                  title="Move down one queue position"
-                                  disabled={
-                                    !canMoveDown || reorderQueue.isPending
-                                  }
-                                  onClick={() => movePlayer("DOWN")}
-                                >
-                                  <ChevronDown className="size-4" />
-                                </Button>
+                                  <GripVertical className="size-4" />
+                                </span>
                               </div>
                             </td>
                           </tr>
@@ -350,38 +377,6 @@ export function WatchgodView() {
                       })}
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <p className="text-xs text-slate-500">
-                  Page {page} / {totalPages}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-slate-700 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60"
-                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                    disabled={page <= 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                    Prev
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-slate-700 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60"
-                    onClick={() =>
-                      setPage((prev) => Math.min(totalPages, prev + 1))
-                    }
-                    disabled={page >= totalPages}
-                  >
-                    Next
-                    <ChevronRight className="size-4" />
-                  </Button>
                 </div>
               </div>
             </section>
